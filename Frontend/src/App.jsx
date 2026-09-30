@@ -31,8 +31,8 @@ function App() {
     // Setup foreground notification handler
     setupForegroundNotificationHandler((payload) => {
       // Debounced refresh — avoid API storms when many pushes arrive
-      clearTimeout(window.__zevygoNotifRefreshTimer);
-      window.__zevygoNotifRefreshTimer = setTimeout(() => {
+      clearTimeout(window.__apnaMarketNotifRefreshTimer);
+      window.__apnaMarketNotifRefreshTimer = setTimeout(() => {
         window.dispatchEvent(new Event('vendorJobsUpdated'));
         window.dispatchEvent(new Event('vendorStatsUpdated'));
         window.dispatchEvent(new Event('userBookingsUpdated'));

@@ -1,6 +1,6 @@
 /**
  * Single source of truth for product identity.
- * Prefer importing APP_NAME from here — do not hardcode "ZEVYGO" in UI files.
+ * Prefer importing APP_NAME from here — do not hardcode "Apna Market" in UI files.
  */
 export const APP_NAME = 'Apna Market';
 

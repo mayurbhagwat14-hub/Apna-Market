@@ -6,7 +6,7 @@
 const USER_ROLES = {
   USER: 'USER',
   VENDOR: 'VENDOR',
-  /** @deprecated ZEVYGO has no Worker role — kept for legacy JWT compatibility */
+  /** @deprecated Apna Market has no Worker role — kept for legacy JWT compatibility */
   WORKER: 'WORKER',
   ADMIN: 'ADMIN'
 };

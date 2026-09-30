@@ -1,5 +1,5 @@
 /**
- * Service-aware push notification copy — keyed by ZEVYGO category slug.
+ * Service-aware push notification copy — keyed by Apna Market category slug.
  * Used when a user pays for a booking so notifications match the booked service.
  */
 

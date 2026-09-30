@@ -248,9 +248,9 @@ const sendBookingEmails = async (booking, user, vendor, service) => {
       `;
 
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'Zevygo <noreply@zevygo.com>',
+        from: process.env.EMAIL_FROM || 'Apna Market <noreply@apnamarket.com>',
         to: user.email,
-        subject: `Booking Confirmed #${bookingId} - Zevygo`,
+        subject: `Booking Confirmed #${bookingId} - Apna Market`,
         html: emailWrapper(content, 'Confirmed', 'Your booking is scheduled successfully')
       });
     }
@@ -278,9 +278,9 @@ const sendBookingEmails = async (booking, user, vendor, service) => {
       `;
 
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'Zevygo <noreply@zevygo.com>',
+        from: process.env.EMAIL_FROM || 'Apna Market <noreply@apnamarket.com>',
         to: vendor.email,
-        subject: `New Job Assigned #${bookingId} - Zevygo`,
+        subject: `New Job Assigned #${bookingId} - Apna Market`,
         html: emailWrapper(vContent, 'New Job', 'Action Required: New job assigned')
       });
     }
@@ -303,7 +303,7 @@ const sendBookingCompletionEmails = async (booking) => {
         <div style="text-align: center; margin-bottom: 32px;">
           <div style="font-size: 48px; margin-bottom: 16px;">⭐</div>
           <h2>Service Completed</h2>
-          <p>Thank you for choosing Zevygo. We hope the service for <strong>${booking.serviceId?.title || categoryTitle}</strong> (${categoryTitle}) was to your satisfaction.</p>
+          <p>Thank you for choosing Apna Market. We hope the service for <strong>${booking.serviceId?.title || categoryTitle}</strong> (${categoryTitle}) was to your satisfaction.</p>
         </div>
 
         <div class="card" style="background-color: white;">
@@ -331,9 +331,9 @@ const sendBookingCompletionEmails = async (booking) => {
       `;
 
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'Zevygo <noreply@zevygo.com>',
+        from: process.env.EMAIL_FROM || 'Apna Market <noreply@apnamarket.com>',
         to: user.email,
-        subject: `Service Invoice #${bookingId} - Zevygo`,
+        subject: `Service Invoice #${bookingId} - Apna Market`,
         html: emailWrapper(content, 'Invoice', 'Your service is complete. Here is the receipt.')
       });
     }

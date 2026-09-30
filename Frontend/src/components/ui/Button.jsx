@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { FiLoader } from 'react-icons/fi';
 
 /**
- * Shared ZEVYGO Button — auth-screen aligned (2026).
+ * Shared Apna Market Button — auth-screen aligned (2026).
  *
  * Variants: primary | secondary | soft | outline | ghost | danger | icon
  * Sizes: sm | md | lg | xl (xl matches auth CTA height)

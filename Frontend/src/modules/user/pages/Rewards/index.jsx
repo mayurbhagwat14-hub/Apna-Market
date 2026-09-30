@@ -22,7 +22,7 @@ const Rewards = () => {
   const { branding } = useBranding();
 
   const referralLink = useMemo(() => {
-    const slug = (branding.appName || 'zevygo').toLowerCase().replace(/\s+/g, '');
+    const slug = (branding.appName || 'apnamarket').toLowerCase().replace(/\s+/g, '');
     if (typeof window !== 'undefined') {
       return `${window.location.origin}/user/signup?ref=${slug}`;
     }

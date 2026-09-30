@@ -72,16 +72,27 @@ const Settings = () => {
   const handleLogout = async () => {
     try {
       await vendorAuthService.logout();
-      toast.success('Logged out successfully');
-      navigate('/vendor/login');
     } catch (error) {
-      // Even if API call fails, clear local storage
-      localStorage.removeItem('vendorAccessToken');
-      localStorage.removeItem('vendorRefreshToken');
-      localStorage.removeItem('vendorData');
-      toast.success('Logged out successfully');
-      navigate('/vendor/login');
+      console.error('Logout error:', error);
     }
+    const keys = [
+      'vendorAccessToken',
+      'vendorRefreshToken',
+      'vendorData',
+      'vendorPendingJobs',
+      'vendorProfile',
+      'vendorSettings',
+      'vendorWorkers',
+      'vendorAcceptedBookings',
+      'vendorWallet',
+      'vendorTransactions'
+    ];
+    keys.forEach((k) => {
+      try { localStorage.removeItem(k); } catch {}
+      try { sessionStorage.removeItem(k); } catch {}
+    });
+    toast.success('Logged out successfully');
+    window.location.href = '/vendor/login';
   };
 
   const handleDeleteAccount = () => {

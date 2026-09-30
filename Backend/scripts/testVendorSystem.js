@@ -12,7 +12,7 @@ const AuditLog = require('../models/AuditLog');
 const { formatVendorResponse, maskAadhaar, maskPAN } = require('../utils/masking.util');
 
 async function runVendorSystemVerification() {
-  console.log('=== ZEVYGO Service Provider System Verification ===\n');
+  console.log('=== Apna Market Service Provider System Verification ===\n');
 
   try {
     const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/homster';

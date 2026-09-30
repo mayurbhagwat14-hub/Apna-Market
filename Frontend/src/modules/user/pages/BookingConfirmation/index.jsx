@@ -188,7 +188,7 @@ const BookingConfirmation = () => {
         amount: Math.round((orderResponse.data.amount || booking.advanceAmount || 0) * 100),
         currency: 'INR',
         order_id: orderResponse.data.orderId,
-        name: 'Zevygo',
+        name: 'Apna Market',
         description: `Advance payment — ${booking.serviceName || 'Service'}`,
         handler: async (response) => {
           toast.loading('Verifying payment...');

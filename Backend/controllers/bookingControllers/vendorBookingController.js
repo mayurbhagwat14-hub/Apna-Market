@@ -406,7 +406,7 @@ const acceptBooking = async (req, res) => {
           requireAdvancePayment: requiresAdvance,
           paymentPhase: nextPhase,
           status: nextStatus,
-          // ZEVYGO: vendor fulfills the job — no separate worker assignment step
+          // Apna Market: vendor fulfills the job — no separate worker assignment step
           workerId: null,
           assignedAt: new Date()
         }
@@ -664,7 +664,7 @@ const assignWorker = async (req, res) => {
       });
     }
 
-    // ZEVYGO: no Worker role — only vendor self-assignment is allowed
+    // Apna Market: no Worker role — only vendor self-assignment is allowed
     if (workerId === 'SELF' || !workerId || String(workerId) === String(vendorId)) {
       const startCheck = assertCanStartService(booking);
       if (!startCheck.ok) {

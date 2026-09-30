@@ -286,12 +286,26 @@ const Profile = () => {
             e.preventDefault();
             try {
               await vendorAuthService.logout();
-              navigate('/vendor/login');
             } catch (error) {
-              localStorage.removeItem('vendorAccessToken');
-              localStorage.removeItem('vendorData');
-              navigate('/vendor/login');
+              console.error('Logout error:', error);
             }
+            const keys = [
+              'vendorAccessToken',
+              'vendorRefreshToken',
+              'vendorData',
+              'vendorPendingJobs',
+              'vendorProfile',
+              'vendorSettings',
+              'vendorWorkers',
+              'vendorAcceptedBookings',
+              'vendorWallet',
+              'vendorTransactions'
+            ];
+            keys.forEach((k) => {
+              try { localStorage.removeItem(k); } catch {}
+              try { sessionStorage.removeItem(k); } catch {}
+            });
+            window.location.href = '/vendor/login';
           }}
           className="w-full flex items-center justify-center gap-2 py-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-[20px] transition-colors active:scale-[0.98]"
         >
