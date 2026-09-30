@@ -1,34 +1,74 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiBriefcase, FiStar, FiBell, FiArrowRight, FiUser, FiClock, FiMapPin, FiCheckCircle, FiTrendingUp, FiChevronRight, FiLayers, FiPlus } from 'react-icons/fi';
-import { FaWallet } from 'react-icons/fa';
+import {
+  FiBriefcase,
+  FiStar,
+  FiBell,
+  FiUser,
+  FiClock,
+  FiMapPin,
+  FiCheckCircle,
+  FiTrendingUp,
+  FiChevronRight,
+  FiLayers,
+  FiPlus,
+  FiTag,
+  FiEye,
+  FiCamera,
+  FiPhoneCall,
+  FiAlertCircle
+} from 'react-icons/fi';
+import { FaWallet, FaStore } from 'react-icons/fa';
 import { vendorTheme as themeColors, gradients } from '../../../../theme';
 import { Button } from '../../../../components/ui';
 import Header from '../../components/layout/Header';
 import { vendorDashboardService } from '../../services/dashboardService';
-// Booking requests appear under Jobs — no popup alerts
-import { io } from 'socket.io-client';
+import vendorMarketingService from '../../services/vendorMarketingService';
 import api from '../../../../services/api';
-
 import { registerFCMToken } from '../../../../services/pushNotificationService';
 import LogoLoader from '../../../../components/common/LogoLoader';
-import StatsCards from './components/StatsCards';
+import toast from 'react-hot-toast';
+
+// Marketing components
+import QuickMarketingActions from './components/QuickMarketingActions';
+import MarketingStatsCards from './components/MarketingStatsCards';
+import ActiveOffersSection from './components/ActiveOffersSection';
+import ShopGallerySection from './components/ShopGallerySection';
+import CreateOfferModal from './components/CreateOfferModal';
+import UploadPhotoModal from './components/UploadPhotoModal';
 import PendingBookings from './components/PendingBookings';
-
-
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
 
 const Dashboard = memo(() => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Helper function to convert hex to rgba
-  const hexToRgba = (hex, alpha) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+  // Marketing & store state
+  const [marketingData, setMarketingData] = useState({
+    storeName: 'Apna Store',
+    category: 'Local Shop',
+    address: 'Indore, MP',
+    profilePhoto: null,
+    isStoreLive: true,
+    stats: {
+      storeViews: 1480,
+      offerClicks: 215,
+      inquiriesCalls: 38,
+      customerLikes: 94,
+      activeOffersCount: 1,
+      totalPhotosCount: 0
+    },
+    offers: [],
+    shopPhotos: []
+  });
+
+  const [vendorProfile, setVendorProfile] = useState({
+    name: 'Shop Owner',
+    businessName: 'Apna Store',
+    photo: null,
+    categoryName: 'Local Shop',
+    address: 'Indore, MP',
+    service: []
+  });
 
   const [stats, setStats] = useState({
     todayEarnings: 0,
@@ -37,50 +77,73 @@ const Dashboard = memo(() => {
     workersOnline: 0,
     totalEarnings: 0,
     completedJobs: 0,
-    rating: 0,
+    rating: 4.8,
   });
-  const [vendorProfile, setVendorProfile] = useState({
-    name: 'Vendor Name',
-    businessName: 'Business Name',
-    photo: null,
-    service: []
-  });
-  const [recentJobs, setRecentJobs] = useState([]);
+
+  const [listingStats, setListingStats] = useState({ total: 0, live: 0, pending: 0 });
   const [pendingBookings, setPendingBookings] = useState([]);
+  const [recentJobs, setRecentJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [globalConfig, setGlobalConfig] = useState({ maxSearchTime: 5, waveDuration: 60 });
-  const [listingStats, setListingStats] = useState({ total: 0, live: 0, pending: 0 });
+
+  // Modals
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
 
   const ignoredBookingIds = useRef(new Set());
 
-  // Process API response - extracted to avoid duplication
+  // Load all marketing data (Offers, Photos, Store stats)
+  const loadMarketingData = useCallback(async () => {
+    try {
+      const res = await vendorMarketingService.getOverview();
+      if (res.success && res.data) {
+        setMarketingData(prev => ({
+          ...prev,
+          ...res.data,
+          stats: {
+            ...prev.stats,
+            ...res.data.stats,
+            activeOffersCount: (res.data.offers || []).filter(o => o.isActive).length,
+            totalPhotosCount: (res.data.shopPhotos || []).length
+          }
+        }));
+
+        if (res.data.storeName) {
+          setVendorProfile(p => ({
+            ...p,
+            businessName: res.data.storeName,
+            categoryName: res.data.category || p.categoryName,
+            address: res.data.address || p.address
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch marketing overview:', err);
+    }
+  }, []);
+
+  // Process Booking API response
   const processApiResponse = useCallback((response) => {
     if (!response.success) return;
 
     const { stats: apiStats, recentBookings, config } = response.data;
-    if (config) setGlobalConfig(config);
 
-    // Separate requested/searching bookings from other bookings
     const requestedBookings = (recentBookings || []).filter(booking => {
-      const status = booking.status?.toLowerCase();
-      return status === 'requested' || status === 'searching';
+      const s = booking.status?.toLowerCase();
+      return s === 'requested' || s === 'searching';
     });
     const otherBookings = (recentBookings || []).filter(booking => {
-      const status = booking.status?.toLowerCase();
-      return status !== 'requested' && status !== 'searching';
+      const s = booking.status?.toLowerCase();
+      return s !== 'requested' && s !== 'searching';
     });
 
-    // Build pending bookings map
     const mergedMap = new Map();
     const vendorData = JSON.parse(localStorage.getItem('vendorData') || '{}');
     const vendorId = vendorData._id || vendorData.id;
 
     requestedBookings.forEach(b => {
       const id = String(b._id || b.id);
-
-      // Find distance for this vendor if available
-      let distance = 'N/A';
+      let distance = 'Nearby';
       if (b.potentialVendors && vendorId) {
         const potentialVendor = b.potentialVendors.find(pv =>
           String(pv.vendorId?._id || pv.vendorId) === String(vendorId)
@@ -91,18 +154,17 @@ const Dashboard = memo(() => {
       }
 
       mergedMap.set(id, {
-        ...b, // Spread first!
+        ...b,
         id,
-        serviceName: b.serviceName || b.serviceId?.title || 'New Booking Request',
-        serviceCategory: b.serviceCategory || b.serviceId?.categoryId?.title || 'General Service',
+        serviceName: b.serviceName || b.serviceId?.title || 'Customer Inquiry / Order',
+        serviceCategory: b.serviceCategory || b.serviceId?.categoryId?.title || 'Store Order',
         customerName: b.userId?.name || 'Customer',
         location: {
-          address: b.address?.addressLine1 || 'Address not available',
-          distance: distance
+          address: b.address?.addressLine1 || 'Local Customer Area',
+          distance
         },
-        // Prioritize vendorEarnings, fallback to 90% of finalAmount if it's not a free plan (finalAmount > 0)
         price: (b.vendorEarnings > 0 ? b.vendorEarnings : (b.finalAmount > 0 ? b.finalAmount * 0.9 : 0)).toFixed(2),
-        vendorEarnings: b.vendorEarnings, // Ensure it's explicitly passed
+        vendorEarnings: b.vendorEarnings,
         timeSlot: {
           date: new Date(b.scheduledDate).toLocaleDateString(),
           time: b.scheduledTime || 'Time not set'
@@ -112,15 +174,11 @@ const Dashboard = memo(() => {
       });
     });
 
-    // Filter out locally ignored bookings
     const finalMap = new Map();
-    mergedMap.forEach((value, key) => {
-      if (!ignoredBookingIds.current.has(key)) {
-        finalMap.set(key, value);
-      }
+    mergedMap.forEach((val, key) => {
+      if (!ignoredBookingIds.current.has(key)) finalMap.set(key, val);
     });
 
-    // Merge with local storage to avoid losing real-time updates that haven't hit API yet
     const localPending = JSON.parse(localStorage.getItem('vendorPendingJobs') || '[]');
     const apiPending = Array.from(finalMap.values());
     const mergedPending = [...apiPending];
@@ -128,22 +186,9 @@ const Dashboard = memo(() => {
     localPending.forEach(localJob => {
       const id = String(localJob.id || localJob._id);
       if (!mergedPending.find(job => String(job.id || job._id) === id) && !ignoredBookingIds.current.has(id)) {
-
-        const createdAt = localJob.createdAt ? new Date(localJob.createdAt).getTime() : Date.now();
-        const expiresAt = localJob.expiresAt || (localJob.createdAt && config ? new Date(createdAt + (config.maxSearchTime || 5) * 60000).toISOString() : null);
-        const isExpired = (expiresAt && new Date(expiresAt) <= new Date()) || (Date.now() - createdAt > 300000);
-
         const lowerStatus = String(localJob.status || '').toLowerCase();
-
-        if (!isExpired && (lowerStatus === 'requested' || lowerStatus === 'searching')) {
-          mergedPending.push({
-            ...localJob,
-            id,
-            serviceName: localJob.serviceName || localJob.serviceId?.title || 'New Booking Request',
-            serviceCategory: localJob.serviceCategory || localJob.serviceId?.categoryId?.title || 'General Service',
-            customerName: localJob.customerName || localJob.userId?.name || 'Customer',
-            expiresAt
-          });
+        if (lowerStatus === 'requested' || lowerStatus === 'searching') {
+          mergedPending.push({ ...localJob, id });
         }
       }
     });
@@ -151,7 +196,6 @@ const Dashboard = memo(() => {
     setPendingBookings(mergedPending);
     localStorage.setItem('vendorPendingJobs', JSON.stringify(mergedPending));
 
-    // Update stats
     setStats({
       todayEarnings: apiStats.vendorEarnings || 0,
       activeJobs: apiStats.inProgressBookings || 0,
@@ -159,56 +203,59 @@ const Dashboard = memo(() => {
       workersOnline: apiStats.workersOnline || 0,
       totalEarnings: apiStats.vendorEarnings || 0,
       completedJobs: apiStats.completedBookings || 0,
-      rating: apiStats.rating || 0,
+      rating: apiStats.rating || 4.8,
     });
 
-    // Recent jobs (non-requested)
     const recentJobsData = otherBookings.slice(0, 3).map(booking => ({
       id: booking._id,
-      serviceType: booking.serviceId?.title || 'Service',
+      serviceType: booking.serviceId?.title || 'Order / Inquiry',
       customerName: booking.userId?.name || 'Customer',
-      location: booking.address?.addressLine1 || 'Address not available',
+      location: booking.address?.addressLine1 || 'Local Customer',
       price: (booking.vendorEarnings > 0 ? booking.vendorEarnings : (booking.finalAmount ? booking.finalAmount * 0.9 : 0)).toFixed(2),
-      vendorEarnings: booking.vendorEarnings,
       timeSlot: {
         date: new Date(booking.scheduledDate).toLocaleDateString(),
         time: booking.scheduledTime || 'Time not set'
       },
       status: booking.status,
-      assignedTo: booking.workerId ? { name: booking.workerId.name } : null,
     }));
     setRecentJobs(recentJobsData);
-
-    // Load vendor profile from localStorage (once)
-    const profile = JSON.parse(localStorage.getItem('vendorData') || '{}');
-    setVendorProfile({
-      name: profile.name || 'Vendor Name',
-      businessName: profile.businessName || 'Business Name',
-      photo: profile.profilePhoto || null,
-      service: profile.service || []
-    });
   }, []);
 
-  // Main data loader - useCallback to prevent recreation
+  // Main data loader
   const loadDashboardData = useCallback(async (showSpinner = true) => {
     try {
       if (showSpinner) setLoading(true);
       setError(null);
 
-      const response = await vendorDashboardService.getDashboardStats();
-      processApiResponse(response);
+      // Load marketing overview and dashboard stats simultaneously
+      await Promise.allSettled([
+        loadMarketingData(),
+        vendorDashboardService.getDashboardStats().then(processApiResponse)
+      ]);
+
+      // Load vendor profile from localStorage
+      const profile = JSON.parse(localStorage.getItem('vendorData') || '{}');
+      setVendorProfile(prev => ({
+        ...prev,
+        name: profile.name || prev.name,
+        businessName: profile.businessName || profile.businessDetails?.businessName || profile.name || prev.businessName,
+        photo: profile.profilePhoto || prev.photo,
+        categoryName: (profile.categories && profile.categories[0]) || (profile.service && profile.service[0]) || prev.categoryName,
+        address: profile.address?.city || profile.address?.fullAddress || prev.address
+      }));
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError(String(err.message || 'Failed to load dashboard data'));
     } finally {
       setLoading(false);
     }
-  }, [processApiResponse]);
+  }, [loadMarketingData, processApiResponse]);
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  // Load listing count
   useEffect(() => {
     api.get('/vendors/services', { params: { limit: 50 }, cacheTtl: 30 })
       .then((res) => {
@@ -222,147 +269,126 @@ const Dashboard = memo(() => {
       .catch(() => {});
   }, []);
 
-  // If navigated with a specific request id, open Jobs queue (no popup)
+  // Event listeners for real-time updates
   useEffect(() => {
-    if (location.state?.openBookingId) {
-      navigate('/vendor/jobs', { replace: true });
-    }
-  }, [location.state, navigate]);
-
-  // Listen for real-time updates via window events (dispatched by useAppNotifications)
-  useEffect(() => {
-    let refreshTimer = null;
-    const handleUpdate = () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => loadDashboardData(false), 1000);
-    };
-
-    // Ask for notification permission and register FCM
     registerFCMToken('vendor', true).catch(err => console.error('FCM registration failed:', err));
 
-    // Quiet queue: new requests refresh pending list only (no fullscreen alert)
-    const handleShowAlert = (e) => {
-      if (e.detail) {
-        setPendingBookings(prev => {
-          if (prev.find(b => b.id === e.detail.id)) return prev;
-          return [e.detail, ...prev];
-        });
-      }
-    };
-
-    const handleRemoveBooking = (e) => {
-      if (e.detail?.id) {
-        const idToRemove = String(e.detail.id);
-
-        // Add to ignored list so it doesn't come back on next fetch
-        ignoredBookingIds.current.add(idToRemove);
-
-        // Remove from pending bookings state immediately
-        setPendingBookings(prev => prev.filter(b => String(b.id || b._id) !== idToRemove));
-
-        // Remove from recent jobs state
-        setRecentJobs(prev => prev.filter(b => String(b.id || b._id) !== idToRemove));
-
-        // Remove from localStorage
-        const pendingJobs = JSON.parse(localStorage.getItem('vendorPendingJobs') || '[]');
-        const updatedPending = pendingJobs.filter(job => String(job.id || job._id) !== idToRemove);
-        localStorage.setItem('vendorPendingJobs', JSON.stringify(updatedPending));
-      }
+    const handleUpdate = () => {
+      loadMarketingData();
     };
 
     window.addEventListener('vendorJobsUpdated', handleUpdate);
     window.addEventListener('vendorStatsUpdated', handleUpdate);
-    window.addEventListener('showDashboardBookingAlert', handleShowAlert);
-    window.addEventListener('removeVendorBooking', handleRemoveBooking);
 
     return () => {
       window.removeEventListener('vendorJobsUpdated', handleUpdate);
       window.removeEventListener('vendorStatsUpdated', handleUpdate);
-      window.removeEventListener('showDashboardBookingAlert', handleShowAlert);
-      window.removeEventListener('removeVendorBooking', handleRemoveBooking);
-      if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [loadDashboardData]);
+  }, [loadMarketingData]);
 
-
-  // Memoize quickActions to prevent recreation on every render
-  const quickActions = useMemo(() => [
-    {
-      title: 'Active Jobs',
-      icon: FiBriefcase,
-      color: themeColors?.brand?.blue || '#016A54',
-      path: '/vendor/jobs',
-      count: stats.activeJobs,
-      subtitle: `${stats.activeJobs} running`,
-    },
-    {
-      title: 'My Ratings',
-      icon: FiStar,
-      color: '#F59E0B',
-      path: '/vendor/ratings',
-      count: stats.rating > 0 ? stats.rating.toFixed(1) : '—',
-      subtitle: 'Customer feedback',
-    },
-    {
-      title: 'Wallet',
-      icon: FaWallet,
-      color: '#F59E0B',
-      path: '/vendor/wallet',
-      subtitle: `₹${stats.totalEarnings.toLocaleString()} total`,
-    },
-  ], [stats.activeJobs, stats.rating, stats.totalEarnings]);
-
-  const getStatusColor = (status) => {
-    const s = String(status).toLowerCase();
-    const statusColors = {
-      'accepted': '#016A54',
-      'confirmed': '#10B981',
-      'assigned': '#8B5CF6',
-      'journey_started': '#F59E0B',
-      'visited': '#F59E0B',
-      'in_progress': '#F59E0B',
-      'work_done': '#10B981',
-      'completed': '#10B981',
-      'worker_paid': '#016A54',
-      'settlement_pending': '#F97316',
-    };
-    return statusColors[s] || '#6B7280';
+  // Marketing Offer Actions
+  const handleCreateOffer = async (offerData) => {
+    const res = await vendorMarketingService.createOffer(offerData);
+    if (res.success) {
+      await loadMarketingData();
+    }
   };
 
-  const getStatusLabel = (status) => {
-    const s = String(status).toLowerCase();
-    const labels = {
-      'requested': 'Requested',
-      'searching': 'Searching',
-      'accepted': 'Accepted',
-      'confirmed': 'Confirmed',
-      'assigned': 'Assigned',
-      'journey_started': 'On the way',
-      'visited': 'Visited',
-      'in_progress': 'In Progress',
-      'work_done': 'Work Done',
-      'completed': 'Completed',
-      'worker_paid': 'Payment Done',
-      'settlement_pending': 'Settlement',
-      'cancelled': 'Cancelled',
-      'rejected': 'Rejected'
-    };
-    return labels[s] || status;
+  const handleToggleOffer = async (id, isActive) => {
+    try {
+      await vendorMarketingService.updateOffer(id, { isActive });
+      setMarketingData(prev => ({
+        ...prev,
+        offers: prev.offers.map(o => (o._id === id || o.id === id ? { ...o, isActive } : o)),
+        stats: {
+          ...prev.stats,
+          activeOffersCount: prev.offers.filter(o => (o._id === id || o.id === id ? isActive : o.isActive)).length
+        }
+      }));
+      toast.success(isActive ? 'Offer activated live on app!' : 'Offer paused');
+    } catch (err) {
+      toast.error('Failed to update offer');
+    }
   };
 
-  // Show loading state
+  const handleDeleteOffer = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this offer?')) return;
+    try {
+      await vendorMarketingService.deleteOffer(id);
+      setMarketingData(prev => ({
+        ...prev,
+        offers: prev.offers.filter(o => (o._id !== id && o.id !== id)),
+        stats: {
+          ...prev.stats,
+          activeOffersCount: Math.max(0, (prev.stats?.activeOffersCount || 1) - 1)
+        }
+      }));
+      toast.success('Offer deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete offer');
+    }
+  };
+
+  // Marketing Photo Actions
+  const handleUploadPhoto = async (photoData) => {
+    const res = await vendorMarketingService.uploadPhoto(photoData);
+    if (res.success) {
+      await loadMarketingData();
+    }
+  };
+
+  const handleDeletePhoto = async (id) => {
+    if (!window.confirm('Are you sure you want to remove this photo?')) return;
+    try {
+      await vendorMarketingService.deletePhoto(id);
+      setMarketingData(prev => ({
+        ...prev,
+        shopPhotos: prev.shopPhotos.filter(p => (p._id !== id && p.id !== id && p !== id)),
+        stats: {
+          ...prev.stats,
+          totalPhotosCount: Math.max(0, (prev.stats?.totalPhotosCount || 1) - 1)
+        }
+      }));
+      toast.success('Photo removed successfully');
+    } catch (err) {
+      toast.error('Failed to delete photo');
+    }
+  };
+
+  // Store Live visibility toggle
+  const handleToggleStoreLive = async () => {
+    const nextStatus = !marketingData.isStoreLive;
+    try {
+      await vendorMarketingService.toggleVisibility(nextStatus);
+      setMarketingData(prev => ({ ...prev, isStoreLive: nextStatus }));
+      toast.success(nextStatus ? '🟢 Store is now LIVE on Apna Market!' : '🟡 Store is temporarily paused');
+    } catch (err) {
+      toast.error('Failed to toggle status');
+    }
+  };
+
+  // Helper for category badge styling
+  const formatCategory = (cat) => {
+    if (!cat) return '🛍️ Local Store';
+    const s = String(cat).toLowerCase();
+    if (s.includes('shop') || s.includes('retail')) return '🛍️ Retail Shop';
+    if (s.includes('cloth') || s.includes('fashion') || s.includes('wear')) return '👗 Fashion & Wear';
+    if (s.includes('rest') || s.includes('food') || s.includes('cafe')) return '🍽️ Restaurant & Cafe';
+    if (s.includes('salon') || s.includes('beauty')) return '💄 Beauty & Salon';
+    if (s.includes('elec')) return '📱 Electronics';
+    return `🏪 ${cat}`;
+  };
+
   if (loading) {
     return <LogoLoader />;
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="min-h-screen pb-20 flex items-center justify-center relative">
-        <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: gradients.pageSoft }} aria-hidden />
         <div className="text-center px-6 relative z-10">
           <p className="text-5xl mb-4" aria-hidden>⚠️</p>
-          <h2 className="text-neutral-900 text-xl font-semibold mb-2">Failed to Load Dashboard</h2>
+          <h2 className="text-neutral-900 text-xl font-bold mb-2">Failed to Load Dashboard</h2>
           <p className="text-neutral-600 mb-6">{error}</p>
           <Button type="button" onClick={() => window.location.reload()}>
             Try Again
@@ -372,262 +398,223 @@ const Dashboard = memo(() => {
     );
   }
 
+  const currentStoreName = marketingData.storeName || vendorProfile.businessName || vendorProfile.name;
+  const currentCategory = formatCategory(marketingData.category || vendorProfile.categoryName);
+  const currentAddress = marketingData.address || vendorProfile.address || 'Indore, MP';
 
   return (
-    <div className="min-h-screen pb-20 relative bg-[#f8fafc]">
-      {/* Top right background accent (like in the design) */}
-      <div className="fixed top-0 right-0 w-[80vw] h-[400px] bg-gradient-to-b from-[var(--color-primary-50)] to-transparent rounded-bl-full opacity-60 pointer-events-none z-0" aria-hidden />
-      
-      <div className="relative z-10">
+    <div className="min-h-screen pb-24 relative bg-[#f8fafc]">
+      {/* Decorative top-right soft glow */}
+      <div className="fixed top-0 right-0 w-[80vw] h-[360px] bg-gradient-to-b from-[#016A54]/10 to-transparent rounded-bl-full pointer-events-none z-0" aria-hidden />
+
+      {/* Top Header - Vendor / Store Identity */}
+      <div className="relative z-20">
         <Header 
           title="" 
           showBack={false} 
           notificationCount={stats.pendingAlerts} 
           customHeaderContent={
-            <div className="flex items-center gap-3 ml-4 border-l border-white/10 pl-4 py-1 cursor-pointer transition-transform active:scale-95" onClick={() => navigate('/vendor/profile')}>
-              <div className="w-12 h-12 rounded-full overflow-hidden border-[1.5px] border-[#016A54] bg-transparent shrink-0 shadow-lg relative flex items-center justify-center p-0.5">
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
-                  {vendorProfile.photo ? (
-                    <img src={vendorProfile.photo} alt={vendorProfile.name} className="w-full h-full object-cover" />
+            <div 
+              className="flex items-center gap-3 ml-2 pl-3 py-1 cursor-pointer transition-transform active:scale-95"
+              onClick={() => navigate('/vendor/profile')}
+            >
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-emerald-400 bg-white/10 shrink-0 shadow-md relative flex items-center justify-center p-0.5">
+                <div className="w-full h-full rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+                  {marketingData.profilePhoto || vendorProfile.photo ? (
+                    <img 
+                      src={marketingData.profilePhoto || vendorProfile.photo} 
+                      alt={currentStoreName} 
+                      className="w-full h-full object-cover" 
+                    />
                   ) : (
-                    <FiUser className="w-full h-full p-2.5 text-gray-400" />
+                    <FaStore className="w-6 h-6 text-[#016A54]" />
                   )}
                 </div>
               </div>
+
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[17px] font-bold leading-none text-white truncate max-w-[140px] tracking-tight">{vendorProfile.name}</span>
-                  <FiCheckCircle className="w-4 h-4 text-[#10B981] shrink-0" />
+                  <span className="text-[17px] font-black leading-tight text-white truncate max-w-[170px] tracking-tight">
+                    {currentStoreName}
+                  </span>
+                  <FiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                 </div>
-                <span className="text-[12px] text-gray-400 font-medium truncate max-w-[140px] leading-tight flex flex-col gap-0.5">
-                  <span>Professional Driver</span>
-                  <span className="flex items-center gap-1"><FiMapPin className="w-3 h-3" /> Burhanpur, MP</span>
-                </span>
+                <div className="text-[11px] text-emerald-100/90 font-semibold truncate max-w-[180px] leading-tight flex items-center gap-2">
+                  <span className="truncate">{currentCategory}</span>
+                  <span className="text-white/40">•</span>
+                  <span className="flex items-center gap-0.5 truncate text-gray-300">
+                    <FiMapPin className="w-2.5 h-2.5 shrink-0" /> {currentAddress}
+                  </span>
+                </div>
               </div>
             </div>
           }
         />
       </div>
 
-      <main className="pt-0 relative z-10">
-        {/* Profile Card Section */}
+      <main className="pt-0 relative z-10 space-y-4">
 
-
-
-
-        <div className="px-4 pt-4">
-          <button
-            type="button"
-            onClick={() => navigate('/vendor/my-services')}
-            className="w-full bg-white rounded-2xl p-4 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05)] border border-gray-100 flex items-center justify-between active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[14px] bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                <FiLayers className="w-6 h-6 text-[#016A54]" />
-              </div>
-              <div className="text-left">
-                <p className="text-[16px] font-bold text-gray-900 mb-0.5">My Services</p>
-                <p className="text-[13px] text-gray-500 font-medium">
-                  {listingStats.total === 0
-                    ? 'Add a service + packages for customers to book'
-                    : `${listingStats.live} live • ${listingStats.pending} in review`}
+        {/* 1. Store Online / Live Status Switch Banner */}
+        <div className="px-4 pt-3">
+          <div className="w-full rounded-2xl bg-white border border-gray-100 p-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3.5 w-3.5">
+                {marketingData.isStoreLive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span className={`relative inline-flex rounded-full h-3.5 w-3.5 ${marketingData.isStoreLive ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+              </span>
+              <div>
+                <p className="text-[14px] font-extrabold text-gray-900 leading-tight">
+                  {marketingData.isStoreLive ? 'Store is Live' : 'Store is Paused'}
+                </p>
+                <p className="text-[11px] text-gray-500 font-medium">
+                  {marketingData.isStoreLive ? 'Nearby customers can discover & call your shop' : 'Store is currently hidden from customer search'}
                 </p>
               </div>
             </div>
-            <span className="flex items-center gap-1.5 text-[14px] font-bold text-[#016A54]">
-              {listingStats.total === 0 ? 'Create' : 'Manage'} <FiChevronRight className="w-4 h-4" strokeWidth={3} />
+
+            <button
+              type="button"
+              onClick={handleToggleStoreLive}
+              className={`px-3 py-1.5 rounded-full text-xs font-black tracking-wide transition-all shadow-xs ${
+                marketingData.isStoreLive 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' 
+                  : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              {marketingData.isStoreLive ? 'Live on App' : 'Go Online'}
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Quick Marketing Actions Bar (Post Offer, Upload Photos, Catalog) */}
+        <QuickMarketingActions
+          storeName={currentStoreName}
+          onOpenOfferModal={() => setIsOfferModalOpen(true)}
+          onOpenPhotoModal={() => setIsPhotoModalOpen(true)}
+        />
+
+        {/* 3. Marketing Reach & Footfall Analytics (Impressions, Clicks, Inquiries) */}
+        <MarketingStatsCards
+          stats={marketingData.stats}
+          onOpenOffers={() => setIsOfferModalOpen(true)}
+          onOpenPhotos={() => setIsPhotoModalOpen(true)}
+        />
+
+        {/* 4. Active Offers & Discounts Manager Section */}
+        <div className="px-4">
+          <ActiveOffersSection
+            offers={marketingData.offers}
+            onOpenCreateModal={() => setIsOfferModalOpen(true)}
+            onToggleOffer={handleToggleOffer}
+            onDeleteOffer={handleDeleteOffer}
+          />
+        </div>
+
+        {/* 5. Shop Showcase & Photos Gallery Section */}
+        <div className="px-4">
+          <ShopGallerySection
+            photos={marketingData.shopPhotos}
+            onOpenUploadModal={() => setIsPhotoModalOpen(true)}
+            onDeletePhoto={handleDeletePhoto}
+          />
+        </div>
+
+        {/* 6. Catalog / Services Management Button */}
+        <div className="px-4">
+          <button
+            type="button"
+            onClick={() => navigate('/vendor/my-services')}
+            className="w-full bg-white rounded-3xl p-4 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center justify-between active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
+                <FiLayers className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-[15px] font-bold text-gray-900 mb-0.5">Product & Menu Catalog</p>
+                <p className="text-[12px] text-gray-500 font-medium">
+                  {listingStats.total === 0
+                    ? 'Add items & rate cards for customers to explore'
+                    : `${listingStats.live} items live • ${listingStats.pending} in review`}
+                </p>
+              </div>
+            </div>
+            <span className="flex items-center gap-1 text-[13px] font-bold text-[#016A54] bg-[#016A54]/10 px-3 py-1.5 rounded-full">
+              {listingStats.total === 0 ? 'Add Items' : 'Manage'} <FiChevronRight className="w-3.5 h-3.5" strokeWidth={3} />
             </span>
           </button>
         </div>
 
-        {/* Stats Cards - Optimized Component */}
-        <StatsCards stats={stats} />
-
-        {/* Content Section (below gradient) */}
-        <div className="px-4 py-4 space-y-4">
-          {/* Pending Booking Alerts - Optimized Component */}
-          <PendingBookings
-            bookings={pendingBookings}
-            setPendingBookings={setPendingBookings}
-          />
-
-          {/* Performance Overview */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">Performance Overview</h2>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
-                This Month <FiChevronRight className="w-3.5 h-3.5 rotate-90" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Completed Jobs Card */}
-              <div className="bg-white rounded-3xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] border border-gray-100 flex flex-col justify-between hover:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] transition-shadow min-h-[160px]">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#016A54] shadow-sm"></span>
-                    <p className="text-[12px] font-bold text-gray-700">Completed Jobs</p>
-                  </div>
-                  <p className="text-[32px] font-black text-gray-900 leading-none">{stats.completedJobs}</p>
-                </div>
-                <div className="mt-4 h-[60px] w-full relative">
-                  <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                    <path d="M0,30 L15,25 L30,28 L45,15 L60,20 L75,10 L90,12 L100,2" fill="none" stroke="#016A54" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M0,30 L15,25 L30,28 L45,15 L60,20 L75,10 L90,12 L100,2 L100,40 L0,40 Z" fill="url(#chart-grad-1)" opacity="0.4" />
-                    <defs>
-                      <linearGradient id="chart-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#016A54" stopOpacity="1" />
-                        <stop offset="100%" stopColor="#016A54" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <circle cx="0" cy="30" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="15" cy="25" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="30" cy="28" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="45" cy="15" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="60" cy="20" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="75" cy="10" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="90" cy="12" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                    <circle cx="100" cy="2" r="2.5" fill="#016A54" stroke="white" strokeWidth="1" />
-                  </svg>
-                  <div className="flex justify-between w-full text-[8px] font-bold text-gray-400 mt-2.5 px-0.5">
-                    <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Rating Card */}
-              <div className="bg-white rounded-3xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] border border-gray-100 flex flex-col justify-between hover:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] transition-shadow min-h-[160px]">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <FiStar className="w-3.5 h-3.5 text-[#8B5CF6]" fill="#8B5CF6" />
-                    <p className="text-[12px] font-bold text-gray-700">Average Rating</p>
-                  </div>
-                  <p className="text-[32px] font-black text-gray-900 leading-none">{stats.rating > 0 ? stats.rating.toFixed(1) : '3.0'}</p>
-                </div>
-                <div className="mt-4 h-[60px] w-full relative">
-                  <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                    <path d="M0,35 L15,25 L30,20 L45,15 L60,12 L75,14 L90,5 L100,2" fill="none" stroke="#8B5CF6" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M0,35 L15,25 L30,20 L45,15 L60,12 L75,14 L90,5 L100,2 L100,40 L0,40 Z" fill="url(#chart-grad-2)" opacity="0.4" />
-                    <defs>
-                      <linearGradient id="chart-grad-2" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
-                        <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <circle cx="0" cy="35" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="15" cy="25" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="30" cy="20" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="45" cy="15" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="60" cy="12" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="75" cy="14" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="90" cy="5" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                    <circle cx="100" cy="2" r="2.5" fill="#8B5CF6" stroke="white" strokeWidth="1" />
-                  </svg>
-                  <div className="flex justify-between w-full text-[8px] font-bold text-gray-400 mt-2.5 px-0.5">
-                    <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* 7. Pending Customer Inquiries / Orders (if any) */}
+        {pendingBookings.length > 0 && (
+          <div className="px-4">
+            <PendingBookings
+              bookings={pendingBookings}
+              setPendingBookings={setPendingBookings}
+            />
           </div>
+        )}
 
-          {/* Recent Jobs - List View */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">Active Jobs</h2>
-              {recentJobs.length > 0 && (
+        {/* 8. Local Marketing Footfall Growth Tips Card */}
+        <div className="px-4">
+          <div className="rounded-3xl p-4.5 bg-gradient-to-br from-[#016A54] to-[#014032] text-white shadow-lg shadow-[#016A54]/15 relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">
+                  Store Growth Tip
+                </span>
+                <span className="text-emerald-200 text-xs font-semibold">Attract 3x Footfall</span>
+              </div>
+              <h4 className="text-[15px] font-black tracking-tight mb-1">
+                Weekend Flash Offers & Clear Storefront Photos
+              </h4>
+              <p className="text-[12px] text-emerald-100/80 font-medium leading-relaxed mb-3">
+                Customers in your area search for active discounts on weekends. Keep your photos and festive banners updated to rank on top.
+              </p>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate('/vendor/jobs')}
-                  className="font-bold text-[13px] text-[#016A54] hover:text-primary-600 transition-colors"
+                  type="button"
+                  onClick={() => setIsOfferModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-full bg-white text-[#016A54] text-xs font-black shadow-md hover:bg-emerald-50 active:scale-95 transition-all"
                 >
-                  View All
+                  Create Weekend Deal
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold hover:bg-white/25 transition-all"
+                >
+                  Upload New Photo
+                </button>
+              </div>
             </div>
-            {recentJobs.length > 0 ? (
-              <div className="space-y-3">
-                {recentJobs.map((job, index) => {
-                  const statusColors = {
-                    'Completed': '#10b981',
-                    'Canceled': '#ef4444',
-                    'Ongoing': '#016A54',
-                  };
-                  
-                  const label = getStatusLabel(job.status);
-                  const dummyBorderColors = ['#016A54', '#ef4444', '#f59e0b', '#0ea5e9'];
-                  const accentColor = statusColors[label] || dummyBorderColors[index % dummyBorderColors.length];
 
-                  return (
-                    <div
-                      key={job.id}
-                      onClick={() => navigate(`/vendor/booking/${job.id}`)}
-                      className="bg-white rounded-[20px] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.03)] cursor-pointer active:scale-[0.98] transition-all duration-300 relative overflow-hidden border border-gray-100 hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]"
-                    >
-                      <div
-                        className="absolute left-0 top-0 bottom-0 w-[5px]"
-                        style={{ background: accentColor }}
-                      />
-
-                      <div className="px-4 py-4 pl-5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 border border-primary-100 bg-primary-50/50">
-                            <FiUser className="w-5 h-5 text-primary-400" strokeWidth={2} />
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-[15px] font-bold text-gray-900 truncate tracking-tight">{job.customerName}</p>
-                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary-50 text-primary-500 tracking-wide border border-primary-200">
-                                {job.serviceType || 'Service'}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1 mb-2">
-                              <FiMapPin className="w-3.5 h-3.5 text-gray-400" />
-                              <span className="text-[13px] text-gray-500 font-medium truncate">{job.location}</span>
-                            </div>
-
-                            <div className="flex items-center gap-3 mt-1.5">
-                              <span
-                                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: `${accentColor}15`, color: accentColor }}
-                              >
-                                {label}
-                              </span>
-                              
-                              <div className="flex items-center gap-1 text-gray-400">
-                                <FiClock className="w-3 h-3" />
-                                <span className="text-[11px] font-medium">{job.time}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200 bg-white shadow-sm transition-colors hover:bg-gray-50">
-                            <FiChevronRight className="w-4 h-4 text-gray-600" strokeWidth={3} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div
-                className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] text-center border border-gray-100"
-              >
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FiBriefcase className="w-7 h-7 text-gray-400" />
-                </div>
-                <p className="text-[15px] font-bold text-gray-800 mb-1">No active jobs</p>
-                <p className="text-[13px] text-gray-500 font-medium">New bookings will appear here</p>
-              </div>
-            )}
+            {/* Decorative Vector */}
+            <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
           </div>
         </div>
+
       </main>
+
+      {/* Create Offer Modal */}
+      <CreateOfferModal
+        isOpen={isOfferModalOpen}
+        onClose={() => setIsOfferModalOpen(false)}
+        onOfferCreated={handleCreateOffer}
+      />
+
+      {/* Upload Photo Modal */}
+      <UploadPhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        onPhotoUploaded={handleUploadPhoto}
+      />
 
     </div>
   );
 });
 
+Dashboard.displayName = 'VendorDashboard';
 export default Dashboard;

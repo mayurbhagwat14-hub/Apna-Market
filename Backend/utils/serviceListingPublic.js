@@ -97,8 +97,13 @@ const toPublicListingDto = (listing) => {
       ...buildHighlights(live.serviceAreaFormAnswers || {}, category?.serviceAreaFormSchema || []),
       ...buildHighlights(live.bookingRulesFormAnswers || {}, category?.bookingRulesFormSchema || [])
     ],
-    portfolioPhotos: live.portfolioPhotos || [],
+    portfolioPhotos: Array.from(new Set([
+      ...(live.portfolioPhotos || []),
+      ...((vendor?.shopPhotos || []).map(p => p.url).filter(Boolean))
+    ])),
     portfolioVideos: live.portfolioVideos || [],
+    offer: (vendor?.offers || []).find(o => o.isActive) || answers.offer || null,
+    offers: vendor?.offers || [],
     documents: (live.documents || []).map((d) => ({
       label: d.label,
       url: d.url,
@@ -116,7 +121,8 @@ const toPublicListingDto = (listing) => {
     },
     provider: {
       id: vendor._id.toString(),
-      name: vendor.name,
+      name: vendor.businessName || vendor.name,
+      businessName: vendor.businessName || vendor.name,
       photo: vendor.profilePhoto,
       rating: vendor.rating || 4.8,
       reviews: vendor.totalReviews || 0,

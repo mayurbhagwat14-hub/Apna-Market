@@ -187,6 +187,7 @@ app.use('/api/vendors/bookings', require('./routes/vendor-routes/booking.routes'
 app.use('/api/vendors/fcm-tokens', require('./routes/vendor-routes/fcmToken.routes'));
 app.use('/api/vendors', require('./routes/vendor-routes/vendorBill.routes'));
 app.use('/api/vendors/catalog', require('./routes/vendor-routes/catalog.routes'));
+app.use('/api/vendors/marketing', require('./routes/vendor-routes/marketing.routes'));
 
 
 // Admin routes

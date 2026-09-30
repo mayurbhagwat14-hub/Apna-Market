@@ -31,6 +31,9 @@ import {
   FiMusic,
   FiSun,
   FiMap,
+  FiUploadCloud,
+  FiSliders,
+  FiShoppingBag,
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { z } from 'zod';
@@ -72,195 +75,107 @@ const bankSchema = z.object({
   ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code format (e.g. SBIN0001234)'),
 });
 
-const STEPS = ['Details', 'Identity & KYC', 'Bank Details', 'Verify OTP'];
+const STEPS = ['Details', 'KYC', 'Services & Requirements', 'Bank Details', 'Verify OTP'];
 
-const ALL_16_CATEGORIES = [
+const DEFAULT_MARKET_CATEGORIES = [
   {
-    id: '1',
-    title: 'Driver Booking',
-    icon: FiNavigation,
-    badge: 'Instant & Outstation',
+    id: 'shops',
+    title: 'Shops',
+    subtitle: 'All Stores & Kirana',
+    imageUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=300&auto=format&fit=crop&q=80',
+    homeIconUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=300&auto=format&fit=crop&q=80',
+    badge: 'Retail',
     vendorFormSchema: [
-      { key: 'drivingLicense', label: 'Driving License Number', type: 'text', required: true, order: 1 },
-      { key: 'licenseType', label: 'License Type', type: 'select', options: ['LMV Commercial', 'LMV Private', 'HMV Heavy Vehicle', 'Transport Vehicle'], required: true, order: 2 },
-      { key: 'experienceYears', label: 'Driving Experience (Years)', type: 'number', required: true, order: 3 },
-      { key: 'serviceType', label: 'Service Type Offered', type: 'multiselect', options: ['Driver Only', 'Driver + Vehicle'], required: true, order: 4 },
-      { key: 'vehicleTypes', label: 'Driveable Vehicle Types', type: 'multiselect', options: ['Hatchback', 'Sedan', 'SUV', 'Luxury', 'Tempo Traveller', 'Mini Bus'], order: 5 },
-      { key: 'routeTypes', label: 'Route Availability', type: 'multiselect', options: ['Local', 'Outstation', 'Airport Transfer', 'Corporate', 'One-Way', 'Round-Trip'], required: true, order: 6 },
+      { key: 'shopName', label: 'Shop / Store Name', type: 'text', required: true, helpText: 'Full trading name of your shop', order: 1 },
+      { key: 'storeType', label: 'Store Type', type: 'select', options: ['Kirana / Grocery', 'Supermarket', 'General Store', 'Dairy & Sweets', 'Bakery', 'Organic & Health Food', 'Stationery & Gifts'], required: true, order: 2 },
+      { key: 'deliveryAvailable', label: 'Home Delivery Available', type: 'toggle', required: false, order: 3 },
+      { key: 'deliveryRadiusKm', label: 'Delivery Radius (in KM)', type: 'number', required: false, helpText: 'Maximum distance you deliver locally', minValue: 1, maxValue: 50, order: 4 },
+      { key: 'minimumOrderValue', label: 'Minimum Order Value (₹)', type: 'number', required: false, minValue: 0, order: 5 },
+      { key: 'operatingHours', label: 'Daily Operating Hours', type: 'text', required: true, helpText: 'e.g. 8:00 AM - 10:00 PM', order: 6 },
+      { key: 'gstNumber', label: 'GST Number (Optional)', type: 'text', required: false, helpText: '15-digit GSTIN if registered', order: 7 }
     ]
   },
   {
-    id: '2',
-    title: 'Cook / Maharaj Booking',
-    icon: FiCoffee,
-    badge: 'Popular & Daily',
+    id: 'clothing',
+    title: 'Clothing',
+    subtitle: 'Fashion & Style',
+    imageUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=300&auto=format&fit=crop&q=80',
+    homeIconUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=300&auto=format&fit=crop&q=80',
+    badge: 'Fashion',
     vendorFormSchema: [
-      { key: 'cuisineSpecialization', label: 'Cuisine Specialization', type: 'multiselect', options: ['North Indian', 'South Indian', 'Gujarati', 'Rajasthani', 'Jain', 'Chinese', 'Continental', 'Mughlai', 'Punjabi'], required: true, order: 1 },
-      { key: 'dietType', label: 'Diet Preference', type: 'select', options: ['Pure Veg', 'Veg & Non-Veg', 'Non-Veg Only'], required: true, order: 2 },
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 3 },
-      { key: 'serviceType', label: 'Service Type', type: 'multiselect', options: ['Daily Cook', 'Part-time Cook', 'Full-time Cook', 'Event / Maharaj', 'Party Cook'], required: true, order: 4 },
-      { key: 'meals', label: 'Meals Prepared', type: 'multiselect', options: ['Breakfast', 'Lunch', 'Dinner', 'Snacks/Tea'], required: true, order: 5 },
+      { key: 'boutiqueName', label: 'Boutique / Store Name', type: 'text', required: true, order: 1 },
+      { key: 'clothingCategories', label: 'Apparel Types Sold', type: 'multiselect', options: ["Men's Wear", "Women's Ethnic", "Women's Western", "Kids & Infants", "Bridal & Festive", "Fabrics & Unstitched", "Accessories & Footwear"], required: true, order: 2 },
+      { key: 'alterationAvailable', label: 'Alteration / Custom Tailoring Service Available', type: 'toggle', required: false, order: 3 },
+      { key: 'trialRoomAvailable', label: 'Trial / Fitting Room Available', type: 'toggle', required: false, order: 4 },
+      { key: 'priceRange', label: 'Price Segment', type: 'select', options: ['Budget Friendly (Under ₹999)', 'Mid-Range (₹1,000 - ₹3,500)', 'Premium Designer (₹3,500+)'], required: true, order: 5 },
+      { key: 'operatingHours', label: 'Store Timings', type: 'text', required: false, helpText: 'e.g. 11:00 AM - 9:30 PM', order: 6 }
     ]
   },
   {
-    id: '3',
-    title: 'Worker / Helper Booking',
-    icon: FiUsers,
-    badge: 'Labour & Shifting',
+    id: 'restaurants',
+    title: 'Restaurants',
+    subtitle: 'Food & Drinks',
+    imageUrl: '/tasty-food-banner.jpg',
+    homeIconUrl: '/tasty-food-banner.jpg',
+    badge: 'Food',
     vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'workerSkills', label: 'Skills & Work Offered', type: 'multiselect', options: ['Loading / Unloading', 'House Shifting', 'Construction Labour', 'Gardening', 'Packing', 'Cleaning', 'General Helper'], required: true, order: 2 },
-      { key: 'workersAvailable', label: 'Number of Workers Available', type: 'number', required: true, order: 3 },
+      { key: 'restaurantName', label: 'Restaurant / Cafe Name', type: 'text', required: true, order: 1 },
+      { key: 'cuisineSpecialization', label: 'Cuisines Offered', type: 'multiselect', options: ['North Indian', 'South Indian', 'Chinese & Pan-Asian', 'Street Food & Chaat', 'Italian & Pizza', 'Fast Food & Burgers', 'Bakery & Desserts', 'Mughlai & Biryani', 'Sweets & Farsan'], required: true, order: 2 },
+      { key: 'dietaryType', label: 'Dietary Classification', type: 'select', options: ['100% Pure Veg', 'Pure Veg & Jain Available', 'Veg & Non-Veg', 'Multi-Cuisine'], required: true, order: 3 },
+      { key: 'dineInAvailable', label: 'Dine-In Seating Available', type: 'toggle', required: false, order: 4 },
+      { key: 'seatingCapacity', label: 'Seating Capacity (Pax)', type: 'number', required: false, minValue: 0, order: 5 },
+      { key: 'fssaiNumber', label: 'FSSAI License / Registration No.', type: 'text', required: true, helpText: '14-digit FSSAI number', order: 6 },
+      { key: 'averageMealForTwo', label: 'Approx Cost for Two (₹)', type: 'number', required: false, minValue: 50, order: 7 }
     ]
   },
   {
-    id: '4',
-    title: 'Tiffin Service Booking',
-    icon: FiPackage,
-    badge: 'Subscription',
+    id: 'services',
+    title: 'Services',
+    subtitle: 'Home & Personal Repairs',
+    imageUrl: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
+    homeIconUrl: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
+    badge: 'Services',
     vendorFormSchema: [
-      { key: 'tiffinServiceName', label: 'Kitchen / Tiffin Name', type: 'text', required: true, order: 1 },
-      { key: 'dietType', label: 'Food Type', type: 'multiselect', options: ['Veg', 'Jain', 'Non-Veg', 'Vegan', 'Special Health Meal'], required: true, order: 2 },
-      { key: 'meals', label: 'Meals Available', type: 'multiselect', options: ['Breakfast', 'Lunch', 'Dinner'], required: true, order: 3 },
-      { key: 'subscriptionTypes', label: 'Subscription Plans', type: 'multiselect', options: ['Daily Trial', 'Weekly Plan', 'Monthly Plan'], required: true, order: 4 },
+      { key: 'serviceSpecialization', label: 'Services You Provide', type: 'multiselect', options: ['Electrician', 'Plumber', 'AC Repair & Servicing', 'Refrigerator & Washing Machine', 'RO Water Purifier', 'Carpenter', 'Painter', 'Deep Home Cleaning', 'Pest Control'], required: true, order: 1 },
+      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, minValue: 0, maxValue: 50, order: 2 },
+      { key: 'visitingCharge', label: 'Standard Visiting / Inspection Fee (₹)', type: 'number', required: true, helpText: 'Fee charged for visiting & diagnosing', minValue: 0, order: 3 },
+      { key: 'emergencyAvailable', label: '24x7 Emergency Service Available', type: 'toggle', required: false, order: 4 },
+      { key: 'serviceWarrantyDays', label: 'Service Warranty Provided', type: 'select', options: ['No Warranty', '7 Days Warranty', '15 Days Warranty', '30 Days Warranty', '90 Days Warranty'], required: false, order: 5 },
+      { key: 'toolsAndEquipment', label: 'Tools / Equipment Carried', type: 'text', required: false, helpText: 'e.g. Drill, Multimeter, Pipe Wrench, Safety Kit', order: 6 }
     ]
   },
   {
-    id: '5',
-    title: 'DJ Sound Booking',
-    icon: FiMusic,
-    badge: 'Party & Wedding',
+    id: 'beauty-care',
+    title: 'Beauty & Care',
+    subtitle: 'Salon & Wellness',
+    imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&auto=format&fit=crop&q=80',
+    homeIconUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&auto=format&fit=crop&q=80',
+    badge: 'Beauty',
     vendorFormSchema: [
-      { key: 'djName', label: 'DJ / Band Name', type: 'text', required: true, order: 1 },
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 2 },
-      { key: 'equipment', label: 'Equipment Setup', type: 'multiselect', options: ['Dual DJ Console', 'JBL Sound System', 'Subwoofers', 'LED Moving Lights', 'Laser & Smoke Machine', 'Wireless Mics'], required: true, order: 3 },
+      { key: 'salonName', label: 'Salon / Parlour / Artist Name', type: 'text', required: true, order: 1 },
+      { key: 'beautyServices', label: 'Services Offered', type: 'multiselect', options: ['Haircut & Styling', 'Facial & Clean-up', 'Bridal & Party Makeup', 'Hair Spa & Treatment', 'Waxing & Threading', 'Manicure & Pedicure', 'Nail Extensions & Art', "Men's Grooming & Beard Care"], required: true, order: 2 },
+      { key: 'serviceMode', label: 'Service Location / Mode', type: 'select', options: ['At Salon / Studio Only', 'Home Visit / Doorstep Available', 'Both Salon & Home Visit'], required: true, order: 3 },
+      { key: 'experienceYears', label: 'Experience (Years)', type: 'number', required: true, minValue: 0, order: 4 },
+      { key: 'cosmeticBrands', label: 'Cosmetic / Hair Brands Used', type: 'text', required: false, helpText: 'e.g. L\'Oréal, MAC, Kryolan, Lotus, VLCC', order: 5 },
+      { key: 'homeVisitExtraCharge', label: 'Home Visit Extra Charges (₹, if applicable)', type: 'number', required: false, minValue: 0, order: 6 }
     ]
   },
   {
-    id: '6',
-    title: 'Photographer & Videographer Booking',
-    icon: FiCamera,
-    badge: 'Event & Shoot',
+    id: 'electronics',
+    title: 'Electronics',
+    subtitle: 'Gadgets & Repairs',
+    imageUrl: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=300&auto=format&fit=crop&q=80',
+    homeIconUrl: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=300&auto=format&fit=crop&q=80',
+    badge: 'Electronics',
     vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'photographyStyle', label: 'Style & Specialization', type: 'multiselect', options: ['Traditional', 'Candid', 'Cinematic Video', 'Drone Shoot', 'Pre-Wedding', 'Product Shoot', 'Fashion Shoot'], order: 2 },
-      { key: 'cameraEquipment', label: 'Camera & Gear List', type: 'text', helpText: 'e.g. Sony A7IV, Canon R6, DJI Drone', order: 3 },
+      { key: 'businessName', label: 'Electronics Store / Workshop Name', type: 'text', required: true, order: 1 },
+      { key: 'categorySpecialization', label: 'Electronics Categories Handled', type: 'multiselect', options: ['Smartphone Sales & Accessories', 'Mobile Screen & Motherboard Repair', 'Laptops & Computer Repair', 'LED TV & Home Theater', 'Air Conditioners & Coolers', 'Smartwatches, Audio & Cables', 'CCTV & Security Cameras'], required: true, order: 2 },
+      { key: 'repairServiceAvailable', label: 'Repair & Servicing Facility Available', type: 'toggle', required: false, order: 3 },
+      { key: 'pickupDropAvailable', label: 'Free / Paid Device Pickup & Drop Available', type: 'toggle', required: false, order: 4 },
+      { key: 'repairWarranty', label: 'Repair Warranty on Parts', type: 'select', options: ['No Warranty', '1 Month Warranty', '3 Months Warranty', '6 Months Warranty'], required: false, order: 5 },
+      { key: 'operatingHours', label: 'Shop Timings', type: 'text', required: false, helpText: 'e.g. 10:00 AM - 9:00 PM', order: 6 }
     ]
-  },
-  {
-    id: '7',
-    title: 'Makeup Artist Booking',
-    icon: FiSun,
-    badge: 'Bridal & Party',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'services', label: 'Services Offered', type: 'multiselect', options: ['Bridal Makeup', 'Party Makeup', 'Engagement Look', 'HD Airbrush', 'Hair Styling', 'Saree Draping', 'Nail Art'], required: true, order: 2 },
-      { key: 'makeupBrands', label: 'Cosmetic Brands Used', type: 'text', helpText: 'e.g. MAC, Kryolan, Huda Beauty, Bobbi Brown', order: 3 },
-    ]
-  },
-  {
-    id: '8',
-    title: 'Healthcare Service (Home Nurse / Caretaker / Patient Attendant)',
-    icon: FiActivity,
-    badge: 'Patient Care',
-    vendorFormSchema: [
-      { key: 'providerSubType', label: 'Provider Role', type: 'select', options: ['GNM/B.Sc Nurse', 'Caretaker / Attendant', 'Elderly Care', 'Post-Surgery Nurse', 'Baby Caretaker', 'Physiotherapist'], required: true, order: 1 },
-      { key: 'qualification', label: 'Qualifications / Certificate', type: 'text', required: true, order: 2 },
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 3 },
-      { key: 'shiftType', label: 'Shift Options', type: 'multiselect', options: ['8 Hours', '12 Hours', '24 Hours Live-in'], required: true, order: 4 },
-    ]
-  },
-  {
-    id: '9',
-    title: 'Room Booking (Monthly & Yearly Rental)',
-    icon: FiKey,
-    badge: 'Monthly Rent',
-    vendorFormSchema: [
-      { key: 'propertyName', label: 'Property / Building Name', type: 'text', required: true, order: 1 },
-      { key: 'propertyType', label: 'Property Type', type: 'select', options: ['Single Room PG', 'Double Sharing PG', 'Furnished AC Room', '1BHK Flat', '2BHK Flat', 'Studio Apartment'], required: true, order: 2 },
-      { key: 'furnishing', label: 'Furnishing Status', type: 'select', options: ['Fully Furnished', 'Semi-Furnished', 'Unfurnished'], required: true, order: 3 },
-      { key: 'amenities', label: 'Amenities Included', type: 'multiselect', options: ['WiFi', 'AC', 'Kitchen', 'Washing Machine', 'Security', 'Power Backup', 'RO Water', 'Parking'], order: 4 },
-    ]
-  },
-  {
-    id: '10',
-    title: 'Marriage Hall Booking',
-    icon: FiMap,
-    badge: 'Hall & Lawns',
-    vendorFormSchema: [
-      { key: 'hallName', label: 'Hall / Venue Name', type: 'text', required: true, order: 1 },
-      { key: 'indoorCapacity', label: 'Indoor Seating Capacity', type: 'number', required: true, order: 2 },
-      { key: 'facilities', label: 'Facilities Available', type: 'multiselect', options: ['AC Hall', 'Catering Kitchen', 'Decoration', 'DJ Stage', 'Green Room', 'Bridal Suite', 'Parking & Valet', 'Generator'], required: true, order: 3 },
-    ]
-  },
-  {
-    id: '11',
-    title: 'Security Guard Booking',
-    icon: FiShield,
-    badge: 'Residential & Commercial',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'securityType', label: 'Security Type Offered', type: 'multiselect', options: ['Residential Society', 'Commercial / Office', 'Event Security', 'Hospital / School', 'Personal Bodyguard'], required: true, order: 2 },
-      { key: 'guardsAvailable', label: 'Total Guards Available', type: 'number', required: true, order: 3 },
-    ]
-  },
-  {
-    id: '12',
-    title: 'Housekeeping & Home Cleaning Booking',
-    icon: FiHome,
-    badge: 'Deep Cleaning',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'cleaningTypes', label: 'Cleaning Services', type: 'multiselect', options: ['Full Home Deep Cleaning', 'Kitchen Deep Cleaning', 'Bathroom Scrubbing', 'Sofa & Carpet Cleaning', 'Move-in/Move-out Cleaning', 'Floor Polishing'], required: true, order: 2 },
-    ]
-  },
-  {
-    id: '13',
-    title: 'Electrician Booking',
-    icon: FiZap,
-    badge: 'Popular',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'services', label: 'Services Offered', type: 'multiselect', options: ['Fan Installation', 'Switch & Socket Repair', 'Wiring & Short Circuit', 'MCB Box Repair', 'Inverter Setup', 'Light & Chandelier Fitting'], required: true, order: 2 },
-      { key: 'toolsCarried', label: 'Tools & Safety Equipment', type: 'text', helpText: 'e.g. Multimeter, Drill Machine, Safety Gloves', order: 3 },
-      { key: 'emergencyAvailable', label: 'Emergency 24x7 Available', type: 'toggle', order: 4 },
-    ]
-  },
-  {
-    id: '14',
-    title: 'Plumber Booking',
-    icon: FiDroplet,
-    badge: 'Popular',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'services', label: 'Services Offered', type: 'multiselect', options: ['Tap & Mixer Repair', 'Pipe Leakage Fix', 'Toilet Repair & Fitting', 'Water Tank Cleaning', 'Drainage Cleaning', 'Geyser Installation'], required: true, order: 2 },
-      { key: 'toolsCarried', label: 'Tools Carried', type: 'text', order: 3 },
-      { key: 'emergencyAvailable', label: 'Emergency Available', type: 'toggle', order: 4 },
-    ]
-  },
-  {
-    id: '15',
-    title: 'AC, Refrigerator, Washing Machine & RO Service Booking',
-    icon: FiWind,
-    badge: 'Popular',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'applianceTypes', label: 'Appliances Serviced', type: 'multiselect', options: ['AC (Split/Window)', 'Refrigerator', 'Washing Machine', 'RO Water Purifier', 'Microwave', 'Geyser'], required: true, order: 2 },
-      { key: 'acServices', label: 'AC & Appliance Services', type: 'multiselect', options: ['Installation/Uninstallation', 'Gas Filling', 'Repair & PCB', 'Deep Foam Cleaning', 'Filter Replacement'], order: 3 },
-      { key: 'warrantyOffered', label: 'Service Warranty', type: 'select', options: ['7 Days', '15 Days', '30 Days', '90 Days'], order: 4 },
-    ]
-  },
-  {
-    id: '16',
-    title: 'Pest Control Booking',
-    icon: FiCrosshair,
-    badge: 'Herbal & Chemical',
-    vendorFormSchema: [
-      { key: 'experienceYears', label: 'Years of Experience', type: 'number', required: true, order: 1 },
-      { key: 'pestTypes', label: 'Pests Treated', type: 'multiselect', options: ['Cockroaches', 'Termites', 'Mosquitoes', 'Bed Bugs', 'Ants', 'Rodents'], required: true, order: 2 },
-      { key: 'treatmentMethods', label: 'Treatment Methods', type: 'multiselect', options: ['Herbal / Organic Gel', 'Chemical Spray', 'Termite Treatment', 'Fumigation'], required: true, order: 3 },
-    ]
-  },
+  }
 ];
 
 const SIGNUP_STORAGE_KEY = 'zevygo_vendor_signup_state';
@@ -283,18 +198,16 @@ const VendorSignup = () => {
 
   const savedState = getSavedSignupState();
 
-  const [stepIndex, setStepIndex] = useState(savedState?.stepIndex ?? 0); // 0 Info, 1 KYC, 2 Services, 3 Bank, 4 OTP
+  const [stepIndex, setStepIndex] = useState(savedState?.stepIndex ?? 0); // 0 Info, 1 KYC, 2 Services, 3 Bank, 4 OTP, 5 Success
   const [providerType] = useState('INDIVIDUAL');
-  const [categories, setCategories] = useState(ALL_16_CATEGORIES);
+  const [categories, setCategories] = useState(DEFAULT_MARKET_CATEGORIES);
 
   // Multi-Service selection array
-  const [selectedServices, setSelectedServices] = useState(savedState?.selectedServices || ['Electrician Booking']);
-  const [activeTabCategory, setActiveTabCategory] = useState(savedState?.activeTabCategory || 'Electrician Booking');
+  const [selectedServices, setSelectedServices] = useState(savedState?.selectedServices || ['Shops']);
+  const [activeTabCategory, setActiveTabCategory] = useState(savedState?.activeTabCategory || 'Shops');
 
   // Service Specific Form Answers map
-  const [serviceDetailsMap, setServiceDetailsMap] = useState(savedState?.serviceDetailsMap || {
-    'Electrician Booking': { basePrice: '299', visitingCharge: '99', labourCharge: '150', emergencyCharge: '100', experienceYears: '3', tools: 'Multimeter, Drill, Safety Kit' },
-  });
+  const [serviceDetailsMap, setServiceDetailsMap] = useState(savedState?.serviceDetailsMap || {});
 
   const [formData, setFormData] = useState(savedState?.formData || {
     name: '',
@@ -360,17 +273,19 @@ const VendorSignup = () => {
         const res = await publicCatalogService.getCategories();
         if (res?.categories && res.categories.length > 0) {
           const fetched = res.categories.map((c, i) => {
-            const fallbackCat = ALL_16_CATEGORIES.find((def) => {
+            const fallbackCat = DEFAULT_MARKET_CATEGORIES.find((def) => {
               const dLow = def.title.toLowerCase().trim();
               const cLow = c.title.toLowerCase().trim();
               return dLow === cLow || dLow.includes(cLow) || cLow.includes(dLow);
-            }) || ALL_16_CATEGORIES[i % ALL_16_CATEGORIES.length];
+            });
 
             return {
               id: c._id || c.id || String(i),
               title: c.title,
-              icon: fallbackCat?.icon || FiLayers,
-              badge: c.homeBadge || fallbackCat?.badge || 'Available',
+              subtitle: c.subtitle || fallbackCat?.subtitle || '',
+              imageUrl: c.homeIconUrl || c.imageUrl || c.icon || fallbackCat?.imageUrl || '',
+              homeIconUrl: c.homeIconUrl || c.imageUrl || c.icon || fallbackCat?.homeIconUrl || '',
+              badge: c.homeBadge || fallbackCat?.badge || 'Active',
               vendorFormSchema: (c.vendorFormSchema && c.vendorFormSchema.length > 0)
                 ? c.vendorFormSchema
                 : (fallbackCat?.vendorFormSchema || [])
@@ -385,9 +300,7 @@ const VendorSignup = () => {
               const matched = fetched.find((fc) => {
                 const fLow = fc.title.toLowerCase().trim();
                 const sLow = sTitle.toLowerCase().trim();
-                const cleanFLow = fLow.replace(/ booking$/, '').replace(/ service$/, '');
-                const cleanSLow = sLow.replace(/ booking$/, '').replace(/ service$/, '');
-                return fLow === sLow || cleanFLow === cleanSLow || fLow.includes(cleanSLow) || sLow.includes(cleanFLow);
+                return fLow === sLow || fLow.includes(sLow) || sLow.includes(fLow);
               });
               return matched ? matched.title : sTitle;
             });
@@ -401,15 +314,13 @@ const VendorSignup = () => {
             const matched = fetched.find((fc) => {
               const fLow = fc.title.toLowerCase().trim();
               const pLow = prevTab.toLowerCase().trim();
-              const cleanFLow = fLow.replace(/ booking$/, '').replace(/ service$/, '');
-              const cleanPLow = pLow.replace(/ booking$/, '').replace(/ service$/, '');
-              return fLow === pLow || cleanFLow === cleanPLow || fLow.includes(cleanPLow) || pLow.includes(cleanFLow);
+              return fLow === pLow || fLow.includes(pLow) || pLow.includes(fLow);
             });
             return matched ? matched.title : fetched[0].title;
           });
         }
       } catch (err) {
-        console.warn('Using default 16 categories', err);
+        console.warn('Using default market categories', err);
       }
     };
     fetchCats();
@@ -475,7 +386,7 @@ const VendorSignup = () => {
 
   useEffect(() => {
     const otpValue = otp.join('');
-    if (otpValue.length === 6 && !isLoading && otpToken && stepIndex === 3) {
+    if (otpValue.length === 6 && !isLoading && otpToken && stepIndex === 4) {
       handleOtpSubmit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -485,7 +396,7 @@ const VendorSignup = () => {
   const toggleCategorySelection = (catTitle) => {
     if (selectedServices.includes(catTitle)) {
       if (selectedServices.length === 1) {
-        toast.error('Please select at least 1 service category');
+        toast.error('Please select at least 1 category');
         return;
       }
       const updated = selectedServices.filter((s) => s !== catTitle);
@@ -508,20 +419,21 @@ const VendorSignup = () => {
   };
 
   const getDefaultDetailsForCategory = (catTitle) => {
-    const lower = catTitle.toLowerCase();
-    if (lower.includes('driver')) {
-      return { drivingLicense: '', licenseType: 'LMV Commercial', experienceYears: '3', vehicleTypes: 'Sedan, SUV', hourlyRate: '150', dailyRate: '1200' };
-    } else if (lower.includes('room') || lower.includes('rental') || lower.includes('hall')) {
-      return { propertyName: '', roomType: 'Furnished AC Room', monthlyRent: '8500', securityDeposit: '10000', amenities: 'Wi-Fi, AC, Parking, RO Water' };
-    } else if (lower.includes('photo') || lower.includes('dj') || lower.includes('makeup')) {
-      return { specialty: 'Event & Shoot', equipment: 'Camera Kit / Drone', halfDayRate: '3500', fullDayRate: '7000', portfolioLink: '' };
-    } else if (lower.includes('cook') || lower.includes('tiffin')) {
-      return { cuisine: 'North Indian & Gujarati', dietType: 'Pure Veg', perMealRate: '120', monthlyRate: '3500', experienceYears: '4' };
-    } else if (lower.includes('nurse') || lower.includes('health') || lower.includes('security')) {
-      return { qualification: 'Certified Caregiver', shiftType: '12 Hours Shift', perShiftRate: '800', experienceYears: '3' };
-    } else {
-      return { basePrice: '299', visitingCharge: '99', labourCharge: '150', emergencyCharge: '100', experienceYears: '3', tools: 'Standard Repair Kit' };
+    const lower = (catTitle || '').toLowerCase();
+    if (lower.includes('shop')) {
+      return { shopName: '', storeType: 'Kirana / Grocery', deliveryAvailable: false, operatingHours: '8:00 AM - 10:00 PM' };
+    } else if (lower.includes('cloth')) {
+      return { boutiqueName: '', priceRange: 'Mid-Range (₹1,000 - ₹3,500)', alterationAvailable: false };
+    } else if (lower.includes('rest') || lower.includes('food')) {
+      return { restaurantName: '', dietaryType: '100% Pure Veg', dineInAvailable: true, fssaiNumber: '' };
+    } else if (lower.includes('service')) {
+      return { experienceYears: '3', visitingCharge: '99', emergencyAvailable: false };
+    } else if (lower.includes('beauty') || lower.includes('salon')) {
+      return { salonName: '', serviceMode: 'Both Salon & Home Visit', experienceYears: '3' };
+    } else if (lower.includes('elect')) {
+      return { businessName: '', repairServiceAvailable: true };
     }
+    return {};
   };
 
   const updateServiceDetailField = (catTitle, field, value) => {
@@ -620,8 +532,10 @@ const VendorSignup = () => {
       },
       aadhar: formData.aadhar,
       pan: formData.pan,
-      service: [],
-      serviceDetails: {},
+      service: selectedServices,
+      services: selectedServices,
+      serviceDetails: serviceDetailsMap,
+      dynamicFormAnswers: serviceDetailsMap,
       aadharDocument: aadharDoc,
       aadharBackDocument: aadharBackDoc,
       panDocument: panDoc,
@@ -691,8 +605,46 @@ const VendorSignup = () => {
       return;
     }
 
-    // No ID photo upload required - simple verification
+    // Go to Step 2 (Category & Services requirements)
     setStepIndex(2);
+  };
+
+  const goNextFromServices = () => {
+    if (!selectedServices || selectedServices.length === 0) {
+      toast.error('Please select at least one category');
+      return;
+    }
+
+    // Validate required fields for all selected categories
+    for (const catTitle of selectedServices) {
+      const catObj = categories.find((c) => {
+        const cLow = (c.title || '').toLowerCase().trim();
+        const sLow = catTitle.toLowerCase().trim();
+        return cLow === sLow || cLow.includes(sLow) || sLow.includes(cLow);
+      });
+
+      const schema = catObj?.vendorFormSchema || [];
+      const answers = serviceDetailsMap[catTitle] || serviceDetailsMap[catObj?.title] || {};
+
+      for (const field of schema) {
+        if (field.required) {
+          const val = answers[field.key];
+          const isEmpty =
+            val === undefined ||
+            val === null ||
+            (typeof val === 'string' && val.trim() === '') ||
+            (Array.isArray(val) && val.length === 0);
+
+          if (isEmpty) {
+            setActiveTabCategory(catTitle);
+            toast.error(`Please fill "${field.label}" for ${catTitle}`);
+            return;
+          }
+        }
+      }
+    }
+
+    setStepIndex(3);
   };
 
   const submitFullOnboarding = async (isSkipBank = false) => {
@@ -726,7 +678,7 @@ const VendorSignup = () => {
         if (response.success) {
           sessionStorage.removeItem(SIGNUP_STORAGE_KEY);
           localStorage.removeItem(SIGNUP_STORAGE_KEY);
-          setStepIndex(4);
+          setStepIndex(5);
           toast.success('Application Submitted Successfully!');
         } else if (response.code === AUTH_ERROR_CODES.ACCOUNT_EXISTS || isAccountExistsError(response)) {
           navigate('/vendor/login', {
@@ -755,7 +707,7 @@ const VendorSignup = () => {
       const response = await sendVendorOTP(formData.phoneNumber.replace(/\D/g, ''), 'signup');
       if (response.success) {
         setOtpToken(response.token || 'verification-pending');
-        setStepIndex(3);
+        setStepIndex(4);
         setResendTimer(120);
         toast.success('OTP sent successfully to +91 ' + formData.phoneNumber);
       } else if (response.code === AUTH_ERROR_CODES.ACCOUNT_EXISTS || isAccountExistsError(response)) {
@@ -797,7 +749,7 @@ const VendorSignup = () => {
       if (response.success) {
         sessionStorage.removeItem(SIGNUP_STORAGE_KEY);
         localStorage.removeItem(SIGNUP_STORAGE_KEY);
-        setStepIndex(4);
+        setStepIndex(5);
         toast.success('Provider onboarding complete! Pending admin approval.');
       } else if (response.code === AUTH_ERROR_CODES.ACCOUNT_EXISTS || isAccountExistsError(response)) {
         navigate('/vendor/login', {
@@ -824,6 +776,7 @@ const VendorSignup = () => {
   const titles = [
     'Personal & Location Details',
     'Identity & KYC Verification',
+    'Category & Requirements',
     'Bank Account & Payout Setup',
     'Verify Mobile Phone Number',
     'Application Submitted Successfully',
@@ -832,9 +785,10 @@ const VendorSignup = () => {
   const subtitles = [
     'Enter your name, contact, and address details',
     'Enter your Aadhaar & PAN card details for verification',
-    'Enter bank details to receive job payouts directly',
+    'Select your category and fill the required business details',
+    'Enter bank details to receive payouts directly',
     `Enter the 6-digit code sent to +91 ${formData.phoneNumber}`,
-    'Your provider account is under review by Zevygo admin team',
+    `Your provider account is under review by ${appName} admin team`,
   ];
 
   const renderServiceSpecificForm = (catTitle) => {
@@ -959,6 +913,43 @@ const VendorSignup = () => {
                 );
               }
 
+              if (field.type === 'file') {
+                return (
+                  <div key={field.key} className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      {field.label}{field.required ? ' *' : ''}
+                    </label>
+                    {field.helpText && <p className="text-[10px] text-slate-400 mb-1">{field.helpText}</p>}
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-primary-300 bg-primary-50/50 hover:bg-primary-50 cursor-pointer text-xs font-bold text-primary-700 transition-colors">
+                        <FiUploadCloud className="w-4 h-4 text-primary-600" />
+                        <span>{val ? 'Change Document' : 'Upload Document'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              updateServiceDetailField(catTitle, field.key, reader.result);
+                              toast.success(`${field.label} attached`);
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                      {val && (
+                        <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                          <FiCheck className="w-3.5 h-3.5" /> Attached
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <Input
                   key={field.key}
@@ -978,18 +969,10 @@ const VendorSignup = () => {
     return (
       <div className="space-y-3">
         <Input
-          label="Base Service Price (₹) *"
-          type="number"
-          value={details.basePrice || '299'}
-          onChange={(e) => updateServiceDetailField(catTitle, 'basePrice', e.target.value)}
-          placeholder="299"
-        />
-        <Input
-          label="Visiting Charge (₹)"
-          type="number"
-          value={details.visitingCharge || '99'}
-          onChange={(e) => updateServiceDetailField(catTitle, 'visitingCharge', e.target.value)}
-          placeholder="99"
+          label="Business / Store Name *"
+          value={details.shopName || details.businessName || ''}
+          onChange={(e) => updateServiceDetailField(catTitle, 'businessName', e.target.value)}
+          placeholder={`Enter your ${catTitle} business name`}
         />
         <Input
           label="Years of Experience *"
@@ -999,10 +982,10 @@ const VendorSignup = () => {
           placeholder="3"
         />
         <Input
-          label="Tools & Equipment Carried"
-          value={details.tools || ''}
-          onChange={(e) => updateServiceDetailField(catTitle, 'tools', e.target.value)}
-          placeholder="e.g. Multimeter, Drill Machine, Safety Kit"
+          label="Operating Hours"
+          value={details.operatingHours || '9:00 AM - 9:00 PM'}
+          onChange={(e) => updateServiceDetailField(catTitle, 'operatingHours', e.target.value)}
+          placeholder="e.g. 9:00 AM - 9:00 PM"
         />
       </div>
     );
@@ -1011,19 +994,27 @@ const VendorSignup = () => {
   return (
     <AuthShell
       maxWidth="2xl"
-      onBack={stepIndex === 0 ? () => navigate('/vendor/login') : () => setStepIndex((p) => p - 1)}
+      onBack={
+        stepIndex === 0
+          ? () => navigate('/vendor/login')
+          : stepIndex === 5
+            ? undefined
+            : () => setStepIndex((p) => p - 1)
+      }
       title={titles[stepIndex]}
       subtitle={subtitles[stepIndex]}
       footer={
-        <p className="text-sm text-neutral-500">
-          Already a partner?{' '}
-          <Link to="/vendor/login" className="text-primary-500 font-semibold hover:underline">
-            Login here
-          </Link>
-        </p>
+        stepIndex !== 5 ? (
+          <p className="text-sm text-neutral-500">
+            Already a partner?{' '}
+            <Link to="/vendor/login" className="text-primary-500 font-semibold hover:underline">
+              Login here
+            </Link>
+          </p>
+        ) : null
       }
     >
-      <StepIndicator steps={STEPS} current={stepIndex} className="mb-6" />
+      {stepIndex < 5 && <StepIndicator steps={STEPS} current={stepIndex} className="mb-6" />}
 
       {/* STEP 0 — Personal & Location Details */}
       {stepIndex === 0 && (
@@ -1194,16 +1185,171 @@ const VendorSignup = () => {
               iconPosition="right"
               onClick={goNextFromIdentity}
             >
+              Continue to Category & Services
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2 — Category Selection & Dynamic Form (Admin vendorFormSchema) */}
+      {stepIndex === 2 && (
+        <div className="space-y-5 max-w-xl mx-auto">
+          {/* Header instructions */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-primary-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-primary-500/30">
+              <FiLayers className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Select Categories You Offer</h4>
+              <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed">
+                Choose one or more business categories. For each category, fill out the custom dynamic form created by the admin.
+              </p>
+            </div>
+          </div>
+
+          {/* Category Selection Cards */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Available Categories ({categories.length})
+              </label>
+              <span className="text-[11px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-100">
+                {selectedServices.length} Selected
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {categories.map((cat) => {
+                const isSelected = selectedServices.includes(cat.title);
+                const imageSrc = cat.imageUrl || cat.homeIconUrl || cat.icon;
+                return (
+                  <button
+                    key={cat.id || cat.title}
+                    type="button"
+                    onClick={() => toggleCategorySelection(cat.title)}
+                    className={`relative p-2.5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between group overflow-hidden ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50/50 shadow-sm ring-2 ring-primary-400/30'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60 shadow-xs'
+                    }`}
+                  >
+                    {/* Top row with image / icon & check badge */}
+                    <div className="flex items-start justify-between w-full mb-2">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 flex items-center justify-center shrink-0">
+                        {imageSrc && typeof imageSrc === 'string' && (imageSrc.startsWith('http') || imageSrc.startsWith('/')) ? (
+                          <img
+                            src={imageSrc}
+                            alt={cat.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <FiShoppingBag className="w-5 h-5 text-primary-600" />
+                        )}
+                      </div>
+
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                          isSelected ? 'bg-primary-500 text-white shadow-xs' : 'border border-slate-300 bg-white text-transparent'
+                        }`}
+                      >
+                        <FiCheck className="w-3 h-3 stroke-[3]" />
+                      </div>
+                    </div>
+
+                    {/* Title and subtitle */}
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 leading-tight truncate">{cat.title}</h4>
+                      {cat.subtitle && (
+                        <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{cat.subtitle}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* If multiple categories selected, Category Tab Switcher */}
+          {selectedServices.length > 1 && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Fill Details For:
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Switch tabs to complete each category</span>
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {selectedServices.map((catTitle) => {
+                  const isActive = activeTabCategory === catTitle;
+                  return (
+                    <button
+                      key={catTitle}
+                      type="button"
+                      onClick={() => setActiveTabCategory(catTitle)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                        isActive
+                          ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/25'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{catTitle}</span>
+                      {isActive && <FiCheck className="w-3 h-3" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic Form for Active Category */}
+          {activeTabCategory && (
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs">
+                    <FiSliders className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 leading-none">
+                      {activeTabCategory} Requirements
+                    </h3>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      Admin-configured form schema for this category
+                    </p>
+                  </div>
+                </div>
+
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Dynamic Form
+                </span>
+              </div>
+
+              {renderServiceSpecificForm(activeTabCategory)}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" size="xl" onClick={() => setStepIndex(1)}>
+              <FiChevronLeft className="mr-1" /> Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="xl"
+              fullWidth
+              icon={FiArrowRight}
+              iconPosition="right"
+              onClick={goNextFromServices}
+            >
               Continue to Bank Details
             </Button>
           </div>
         </div>
       )}
 
-
-
-      {/* STEP 2 — Bank Account & Payout Setup */}
-      {stepIndex === 2 && (
+      {/* STEP 3 — Bank Account & Payout Setup */}
+      {stepIndex === 3 && (
         <div className="space-y-4 max-w-lg mx-auto">
           <div className="flex items-start gap-3 p-3.5 rounded-xl bg-primary-50 border border-primary-100 text-xs text-blue-800">
             <FiCreditCard className="w-5 h-5 text-primary-500 shrink-0 mt-0.5" />
@@ -1258,7 +1404,7 @@ const VendorSignup = () => {
 
           <div className="flex flex-col gap-3 pt-2">
             <div className="flex gap-3">
-              <Button type="button" variant="outline" size="xl" onClick={() => setStepIndex(1)}>
+              <Button type="button" variant="outline" size="xl" onClick={() => setStepIndex(2)}>
                 <FiChevronLeft className="mr-1" /> Back
               </Button>
               <Button
@@ -1287,14 +1433,14 @@ const VendorSignup = () => {
         </div>
       )}
 
-      {/* STEP 3 — Phone OTP Verification */}
-      {stepIndex === 3 && (
+      {/* STEP 4 — Phone OTP Verification */}
+      {stepIndex === 4 && (
         <form onSubmit={handleOtpSubmit} className="space-y-6 max-w-md mx-auto">
           <OtpInput value={otp} onChange={setOtp} disabled={isLoading} />
           <div className="flex items-center justify-between text-sm">
             <button
               type="button"
-              onClick={() => setStepIndex(2)}
+              onClick={() => setStepIndex(3)}
               className="flex items-center font-medium text-neutral-500 hover:text-neutral-800"
             >
               <FiChevronLeft className="mr-1" /> Back to Bank Details
@@ -1337,8 +1483,8 @@ const VendorSignup = () => {
         </form>
       )}
 
-      {/* STEP 4 — Application Submitted Success Screen */}
-      {stepIndex === 4 && (
+      {/* STEP 5 — Application Submitted Success Screen */}
+      {stepIndex === 5 && (
         <div className="py-6 px-4 text-center space-y-6 max-w-md mx-auto">
           {/* Animated Success Icon */}
           <div className="relative inline-flex items-center justify-center">
@@ -1363,6 +1509,16 @@ const VendorSignup = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
               <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Mobile Number</span>
               <span className="font-bold text-slate-800 text-xs">+91 {formData.phoneNumber}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Selected Categories</span>
+              <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+                {selectedServices.map(s => (
+                  <span key={s} className="px-2 py-0.5 rounded-md bg-primary-100 text-primary-800 font-bold text-[10px]">
+                    {s}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 

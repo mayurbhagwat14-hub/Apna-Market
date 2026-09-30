@@ -572,7 +572,7 @@ const getPublicServiceListings = async (req, res) => {
 
     const [listings, total] = await Promise.all([
       ServiceListing.find(query)
-        .populate('vendorId', 'name profilePhoto rating totalReviews completedJobs address approvalStatus accountStatus')
+        .populate('vendorId', 'name businessName profilePhoto rating totalReviews completedJobs address approvalStatus accountStatus shopPhotos offers')
         .populate('categoryId', 'title slug homeIconUrl bookingMode paymentConfig serviceFulfillmentType trackingType defaultPricingModel vendorFormSchema catalogItemSchema pricingFormSchema availabilityFormSchema serviceAreaFormSchema bookingRulesFormSchema documentsFormSchema')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -617,7 +617,7 @@ const getPublicServiceListingById = async (req, res) => {
     const { isListingBookable, toPublicListingDto } = require('../../utils/serviceListingPublic');
 
     const listing = await ServiceListing.findById(req.params.id)
-      .populate('vendorId', 'name profilePhoto rating totalReviews completedJobs address approvalStatus accountStatus')
+      .populate('vendorId', 'name businessName profilePhoto rating totalReviews completedJobs address approvalStatus accountStatus shopPhotos offers')
       .populate('categoryId', 'title slug homeIconUrl bookingMode paymentConfig serviceFulfillmentType trackingType defaultPricingModel vendorFormSchema catalogItemSchema')
       .lean();
 

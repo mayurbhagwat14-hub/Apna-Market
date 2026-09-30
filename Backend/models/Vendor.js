@@ -252,6 +252,35 @@ const vendorSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // ─── LOCAL STORE MARKETING & PROMOTIONS ───
+  shopPhotos: [{
+    url: { type: String, required: true },
+    caption: { type: String, default: '' },
+    category: { type: String, default: 'Storefront' }, // Storefront, Interior, Counter, Products, Menu
+    uploadedAt: { type: Date, default: Date.now }
+  }],
+  offers: [{
+    title: { type: String, required: true },
+    tagline: { type: String, default: '' },
+    discountBadge: { type: String, default: 'OFFER' }, // e.g. "20% OFF", "FLAT ₹100 OFF", "BOGO"
+    discountPercent: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
+    offerType: { type: String, enum: ['PERCENTAGE', 'FLAT', 'BOGO', 'FESTIVE', 'SPECIAL'], default: 'PERCENTAGE' },
+    code: { type: String, default: 'APNAOFFER' },
+    imageUrl: { type: String, default: '' },
+    validTill: { type: Date, default: null },
+    terms: { type: String, default: '' },
+    isActive: { type: Boolean, default: true },
+    viewsCount: { type: Number, default: 0 },
+    claimsCount: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  marketingStats: {
+    storeViews: { type: Number, default: 1240 },
+    offerClicks: { type: Number, default: 186 },
+    inquiriesCalls: { type: Number, default: 34 },
+    customerLikes: { type: Number, default: 92 }
+  },
   // Settings
   settings: {
     notifications: {

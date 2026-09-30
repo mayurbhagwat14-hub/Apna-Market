@@ -79,14 +79,13 @@ const PendingBookings = memo(({ bookings, setPendingBookings }) => {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-bold text-gray-800">New Requests</h2>
+        <h2 className="text-base font-bold text-gray-800">Customer Inquiries</h2>
         <button
           type="button"
           onClick={() => navigate('/vendor/jobs')}
-          className="text-sm font-medium"
-          style={{ color: themeColors.button }}
+          className="text-sm font-semibold text-[#016A54] hover:underline"
         >
-          Open Jobs
+          View All
         </button>
       </div>
       <div className="space-y-3">

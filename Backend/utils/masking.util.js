@@ -43,6 +43,7 @@ const formatVendorResponse = (vendor) => {
   return {
     id: v._id,
     name: v.name,
+    businessName: v.businessName || v.businessDetails?.businessName || v.name,
     email: v.email,
     phone: v.phone,
     providerType: v.providerType || 'INDIVIDUAL',
@@ -51,6 +52,9 @@ const formatVendorResponse = (vendor) => {
     rejectedReason: v.rejectedReason,
     profilePhoto: v.profilePhoto,
     businessDetails: v.businessDetails || {},
+    shopPhotos: v.shopPhotos || [],
+    offers: v.offers || [],
+    marketingStats: v.marketingStats || {},
     profileCompletion: v.profileCompletion || 50,
     rating: v.rating || 0,
     totalJobs: v.totalJobs || 0,
