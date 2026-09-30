@@ -11,7 +11,8 @@ import { useBranding } from '../../context/BrandingContext';
  * @param {string} size - Size classes for the logo
  */
 const LogoLoader = ({ fullScreen = false, overlay = false, inline = false, size = "w-20 h-20" }) => {
-  const { branding } = useBranding();
+  const brandingContext = useBranding();
+  const branding = brandingContext?.branding || { appName: 'Apna Market', appLogo: '' };
   
   // For route transitions (default), use a non-blocking loader
   // For initial app load, use fullScreen with overlay

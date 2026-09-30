@@ -61,6 +61,7 @@ const BillingPage = lazyLoad(() => import('../pages/BillingPage'));
 const MyServices = lazyLoad(() => import('../pages/MyServices'));
 const AddService = lazyLoad(() => import('../pages/AddService'));
 const Offers = lazyLoad(() => import('../pages/Offers'));
+const Subscription = lazyLoad(() => import('../pages/Subscription'));
 
 // Loading fallback component
 import LogoLoader from '../../../components/common/LogoLoader';
@@ -79,7 +80,8 @@ const VendorRoutes = () => {
     location.pathname.endsWith('/billing') ||
     location.pathname.includes('/add-service') ||
     location.pathname.includes('/edit-service') ||
-    location.pathname.includes('/profile/service-form');
+    location.pathname.includes('/profile/service-form') ||
+    location.pathname.includes('/subscription');
 
   const shouldShowBottomNav = !shouldHideBottomNav;
 
@@ -106,6 +108,7 @@ const VendorRoutes = () => {
               <Route path="/booking/:id/timeline" element={<ProtectedRoute userType="vendor"><BookingTimeline /></ProtectedRoute>} />
               <Route path="/jobs" element={<ProtectedRoute userType="vendor"><ActiveJobs /></ProtectedRoute>} />
               <Route path="/offers" element={<ProtectedRoute userType="vendor"><Offers /></ProtectedRoute>} />
+              <Route path="/subscription" element={<ProtectedRoute userType="vendor"><Subscription /></ProtectedRoute>} />
               <Route path="/my-services" element={<ProtectedRoute userType="vendor"><MyServices /></ProtectedRoute>} />
               <Route path="/add-service" element={<ProtectedRoute userType="vendor"><AddService /></ProtectedRoute>} />
               <Route path="/add-service/:categorySlug" element={<ProtectedRoute userType="vendor"><AddService /></ProtectedRoute>} />

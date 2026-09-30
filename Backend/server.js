@@ -188,6 +188,7 @@ app.use('/api/vendors/fcm-tokens', require('./routes/vendor-routes/fcmToken.rout
 app.use('/api/vendors', require('./routes/vendor-routes/vendorBill.routes'));
 app.use('/api/vendors/catalog', require('./routes/vendor-routes/catalog.routes'));
 app.use('/api/vendors/marketing', require('./routes/vendor-routes/marketing.routes'));
+app.use('/api/vendors/subscription', require('./routes/vendor-routes/subscription.routes'));
 
 
 // Admin routes
@@ -207,6 +208,7 @@ app.use('/api/admin', require('./routes/admin-routes/paymentManagement.routes'))
 app.use('/api/admin', require('./routes/admin-routes/transactionManagement.routes'));
 app.use('/api/admin', require('./routes/admin-routes/upload.routes'));
 app.use('/api/admin', require('./routes/admin-routes/planManagement.routes'));
+app.use('/api/admin', require('./routes/admin-routes/vendorAdPlanManagement.routes'));
 app.use('/api/admin', require('./routes/admin-routes/settings.routes'));
 app.use('/api/admin', require('./routes/admin-routes/reviewManagement.routes'));
 app.use('/api/admin', require('./routes/admin-routes/reportManagement.routes'));

@@ -40,6 +40,7 @@ const iconMap = {
   Settlements: FiDollarSign,
   Settings: FiSettings,
   Plans: FiPackage,
+  "Vendor Subscriptions": FiPackage,
 };
 
 // Helper function to convert child name to route path

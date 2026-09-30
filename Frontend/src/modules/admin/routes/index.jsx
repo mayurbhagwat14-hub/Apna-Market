@@ -28,6 +28,7 @@ const Plans = lazy(() => import('../pages/Plans/Plans'));
 const Settlements = lazy(() => import('../pages/Settlements'));
 const Reviews = lazy(() => import('../pages/Reviews'));
 const ServiceListings = lazy(() => import('../pages/ServiceListings'));
+const VendorAdPlans = lazy(() => import('../pages/VendorAdPlans'));
 
 
 
@@ -72,6 +73,7 @@ const AdminRoutes = () => {
           <Route path="plans" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="reviews" element={<Reviews />} />
           <Route path="service-listings" element={<ServiceListings />} />
+          <Route path="vendor-ad-plans" element={<VendorAdPlans />} />
           <Route path="settlements/*" element={<Settlements />} />
           <Route path="settings/*" element={<Settings />} />
         </Route>

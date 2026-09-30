@@ -2,12 +2,17 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 import { APP_NAME, APP_TAGLINE } from '../theme/brand';
 
-const BrandingContext = createContext();
-
 const DEFAULT_BRANDING = {
   appName: APP_NAME,
   appLogo: '',
 };
+
+const DEFAULT_CONTEXT_VALUE = {
+  branding: DEFAULT_BRANDING,
+  fetchBranding: async () => {},
+};
+
+const BrandingContext = createContext(DEFAULT_CONTEXT_VALUE);
 
 export const BrandingProvider = ({ children }) => {
   const [branding, setBranding] = useState(() => {
@@ -89,4 +94,7 @@ export const BrandingProvider = ({ children }) => {
   );
 };
 
-export const useBranding = () => useContext(BrandingContext);
+export const useBranding = () => {
+  const context = useContext(BrandingContext);
+  return context || DEFAULT_CONTEXT_VALUE;
+};

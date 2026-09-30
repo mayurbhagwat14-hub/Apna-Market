@@ -64,6 +64,17 @@ const QuickMarketingActions = memo(({ onOpenOfferModal, onOpenPhotoModal, storeN
       textColor: 'text-white',
       badge: '1-Click',
       onClick: handleShareStore
+    },
+    {
+      id: 'subscribe',
+      title: 'Subscribe & Advertise',
+      subtitle: 'Boost your shop visibility',
+      icon: FiGift,
+      bg: 'from-[#7C3AED] to-[#5B21B6]',
+      iconBg: 'bg-white/20',
+      textColor: 'text-white',
+      badge: '⚡ Boost',
+      onClick: () => navigate('/vendor/subscription')
     }
   ];
 
