@@ -1,4 +1,4 @@
-# ZEVYGO Design System
+# Apna Market Design System
 
 Single source of truth for brand identity and visual tokens.
 
@@ -15,10 +15,10 @@ Single source of truth for brand identity and visual tokens.
 
 ```js
 import { APP_NAME } from '../theme';
-// APP_NAME === 'ZEVYGO'
+// APP_NAME === 'Apna Market'
 ```
 
-Do **not** hardcode `"ZEVYGO"` in components — import `APP_NAME`.
+Do **not** hardcode `"Apna Market"` in components — import `APP_NAME`.
 
 ## Colors
 

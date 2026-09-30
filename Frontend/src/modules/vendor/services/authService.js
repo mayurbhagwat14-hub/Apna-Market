@@ -108,20 +108,31 @@ export const login = async (credentials) => {
 export const logout = async () => {
   try {
     const response = await api.post('/vendors/auth/logout');
-
-    // Clear tokens
-    localStorage.removeItem('vendorAccessToken');
-    localStorage.removeItem('vendorRefreshToken');
-    localStorage.removeItem('vendorData');
-
     return response.data;
   } catch (error) {
     console.error('Error logging out:', error);
-    // Clear tokens anyway
-    localStorage.removeItem('vendorAccessToken');
-    localStorage.removeItem('vendorRefreshToken');
-    localStorage.removeItem('vendorData');
-    throw error;
+    return null;
+  } finally {
+    const keys = [
+      'vendorAccessToken',
+      'vendorRefreshToken',
+      'vendorData',
+      'vendorPendingJobs',
+      'vendorProfile',
+      'vendorSettings',
+      'vendorWorkers',
+      'vendorAcceptedBookings',
+      'vendorWallet',
+      'vendorTransactions'
+    ];
+    keys.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+      try {
+        sessionStorage.removeItem(k);
+      } catch {}
+    });
   }
 };
 

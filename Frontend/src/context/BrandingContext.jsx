@@ -15,8 +15,14 @@ export const BrandingProvider = ({ children }) => {
       const cached = localStorage.getItem('app_branding');
       if (cached) {
         const parsed = JSON.parse(cached);
+        const cachedName = parsed.appName;
+        const isOldName = cachedName && (
+          cachedName.toLowerCase().includes('zevy') || 
+          cachedName.toLowerCase().includes('zevgo') ||
+          cachedName.toLowerCase().includes('appzeto')
+        );
         return {
-          appName: parsed.appName || APP_NAME,
+          appName: isOldName ? APP_NAME : (cachedName || APP_NAME),
           appLogo: parsed.appLogo || '',
         };
       }
@@ -31,7 +37,12 @@ export const BrandingProvider = ({ children }) => {
       const res = await api.get('/public/config');
       if (res.data && res.data.settings) {
         const rawName = res.data.settings.appName || APP_NAME;
-        const normalizedName = rawName.toLowerCase() === 'zevgo' ? 'Zevygo' : rawName;
+        const isOldName = rawName && (
+          rawName.toLowerCase().includes('zevy') ||
+          rawName.toLowerCase().includes('zevgo') ||
+          rawName.toLowerCase().includes('appzeto')
+        );
+        const normalizedName = isOldName ? APP_NAME : rawName;
         const newBranding = {
           appName: normalizedName,
           appLogo: res.data.settings.appLogo || '',

@@ -2,7 +2,7 @@ const { TRACKING_TYPE, BOOKING_STATUS } = require('./constants');
 
 const VALID_TRACKING_TYPES = Object.values(TRACKING_TYPE);
 
-/** Default tracking UX per official ZEVYGO category slug */
+/** Default tracking UX per official Apna Market category slug */
 const TRACKING_TYPE_BY_SLUG = {
   'driver-booking': TRACKING_TYPE.LIVE,
   'cook-maharaj-booking': TRACKING_TYPE.LIVE,

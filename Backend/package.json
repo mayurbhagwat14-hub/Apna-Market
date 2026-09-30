@@ -9,7 +9,6 @@
     "test": "node tests",
     "seed:admin": "node scripts/seedAdmin.js",
     "seed:database": "node scripts/seedDatabase.js",
-    "seed:master": "node scripts/seedZevygoMaster.js",
     "seed:electrician": "node scripts/seedElectricianService.js",
     "seed:category-sections": "node scripts/seedHomeCategorySections.js",
     "seed:vendors": "node scripts/seedVendors.js",

@@ -182,16 +182,37 @@ export const vendorAuthService = {
 
   // Logout
   logout: async () => {
-    // Remove FCM token before logout
-    await removeFCMToken('vendor');
+    try {
+      await removeFCMToken('vendor');
+    } catch (e) {
+      console.warn('Remove FCM token error:', e);
+    }
     try {
       await api.post('/vendors/auth/logout', { platform: getPlatformType() });
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      const keys = [
+        'vendorAccessToken',
+        'vendorRefreshToken',
+        'vendorData',
+        'vendorPendingJobs',
+        'vendorProfile',
+        'vendorSettings',
+        'vendorWorkers',
+        'vendorAcceptedBookings',
+        'vendorWallet',
+        'vendorTransactions'
+      ];
+      keys.forEach((k) => {
+        try {
+          localStorage.removeItem(k);
+        } catch {}
+        try {
+          sessionStorage.removeItem(k);
+        } catch {}
+      });
     }
-    localStorage.removeItem('vendorAccessToken');
-    localStorage.removeItem('vendorRefreshToken');
-    localStorage.removeItem('vendorData');
   },
 
   // Get profile

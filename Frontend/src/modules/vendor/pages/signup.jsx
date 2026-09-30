@@ -178,7 +178,7 @@ const DEFAULT_MARKET_CATEGORIES = [
   }
 ];
 
-const SIGNUP_STORAGE_KEY = 'zevygo_vendor_signup_state';
+const SIGNUP_STORAGE_KEY = 'apna_market_vendor_signup_state';
 
 const getSavedSignupState = () => {
   try {

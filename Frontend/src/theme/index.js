@@ -1,5 +1,5 @@
 /**
- * ZEVYGO theme barrel — import from here.
+ * Apna Market theme barrel — import from here.
  *
  * @example
  * import { APP_NAME, colors, userTheme, tokens } from '../theme';

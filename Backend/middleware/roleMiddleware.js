@@ -24,7 +24,7 @@ const isVendor = (req, res, next) => {
 };
 
 const isWorker = (req, res) => {
-  // ZEVYGO: Worker role retired — vendors fulfill all services
+  // Apna Market: Worker role retired — vendors fulfill all services
   return res.status(410).json({
     success: false,
     message: 'Worker role is no longer supported. Use the Vendor app.'

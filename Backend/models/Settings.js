@@ -167,7 +167,7 @@ const settingsSchema = new mongoose.Schema({
   },
   appName: {
     type: String,
-    default: 'Zevygo'
+    default: 'Apna Market'
   },
   appLogo: {
     type: String,
