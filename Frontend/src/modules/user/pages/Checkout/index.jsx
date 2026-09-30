@@ -1,0 +1,1927 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { FiArrowLeft, FiShoppingCart, FiTrash2, FiMinus, FiPlus, FiPhone, FiHome, FiClock, FiEdit2, FiCheckCircle, FiInfo, FiCreditCard, FiSmartphone } from 'react-icons/fi';
+import { MdStar } from 'react-icons/md';
+import { toast } from 'react-hot-toast';
+import { themeColors } from '../../../../theme';
+import AddressSelectionModal from './components/AddressSelectionModal';
+import TimeSlotModal from './components/TimeSlotModal';
+import VendorSearchModal from './components/VendorSearchModal';
+import { bookingService } from '../../../../services/bookingService';
+import { paymentService } from '../../../../services/paymentService';
+import { cartService } from '../../../../services/cartService';
+import { configService } from '../../../../services/configService';
+import { getPlans } from '../../services/planService';
+import { userAuthService } from '../../../../services/authService';
+import { useCart } from '../../../../context/CartContext';
+import LiveBookingCard from '../../components/booking/LiveBookingCard';
+import resolveAdvancePaymentConfig from '../../utils/advancePaymentConfig';
+import {
+  customerBookingTypeOptions,
+  defaultBookingTypeForListing,
+  isBookingTypeAllowed
+} from '../../../../utils/listingBookingMode';
+import { useBranding } from '../../../../context/BrandingContext';
+import { Button, Badge } from '../../../../components/ui';
+import { APP_NAME } from '../../../../theme/brand';
+
+const toAssetUrl = (url) => {
+  if (!url) return '';
+  const clean = url.replace('/api/upload', '/upload');
+  if (clean.startsWith('http')) return clean;
+  const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/api$/, '');
+  return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
+};
+
+const Checkout = () => {
+  const { branding } = useBranding();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const listing = location.state?.listing || null;
+  const catalogItem = location.state?.catalogItem || null;
+  const category = location.state?.category || null;
+  const plan = location.state?.plan || null;
+  const { fetchCart: fetchCartGlobal, clearCart: clearCartGlobal, removeCategoryItems: removeCategoryGlobal } = useCart();
+
+  const [cartItems, setCartItems] = useState([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
+  const [address, setAddress] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [addressDetails, setAddressDetails] = useState(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [userPhone, setUserPhone] = useState('');
+
+  // Custom Contact State (for this booking only)
+  const [contactDetails, setContactDetails] = useState({ name: '', phone: '' });
+  const [showContactModal, setShowContactModal] = useState(false);
+
+  // New state for vendor search flow
+  const [currentStep, setCurrentStep] = useState('details'); // 'details' | 'searching' | 'waiting' | 'accepted' | 'payment'
+  const [acceptedVendor, setAcceptedVendor] = useState(null);
+  const [bookingRequest, setBookingRequest] = useState(null);
+  const [searchingVendors, setSearchingVendors] = useState(false);
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [nearbyVendors, setNearbyVendors] = useState([]);
+  const [loadingNearbyVendors, setLoadingNearbyVendors] = useState(false);
+  const [sendingVendorRequest, setSendingVendorRequest] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('online'); // 'online' | 'pay_at_home'
+
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [visitedFee, setVisitedFee] = useState(29);
+  const [gstPercentage, setGstPercentage] = useState(18);
+  const [advancePaymentPercent, setAdvancePaymentPercent] = useState(30);
+  const [platformFeePercent, setPlatformFeePercent] = useState(1);
+  const [bookingType, setBookingType] = useState(() => {
+    const hasListing = Boolean(location.state?.listing);
+    return hasListing ? 'scheduled' : 'instant';
+  }); // 'instant' | 'scheduled'
+
+  const isListingBooking = Boolean(listing || cartItems[0]?.serviceListingId);
+
+  const listingBookingOptions = useMemo(() => {
+    if (!isListingBooking || !listing) return [];
+    return customerBookingTypeOptions(listing.bookingMode, listing.category?.bookingMode);
+  }, [isListingBooking, listing]);
+
+  const showBookingTypeToggle = !isListingBooking || listingBookingOptions.length > 1;
+
+  useEffect(() => {
+    if (isListingBooking && listing) {
+      const defaultType = defaultBookingTypeForListing(listing.bookingMode, listing.category?.bookingMode);
+      setBookingType(defaultType);
+    }
+  }, [isListingBooking, listing?.id, listing?.bookingMode]);
+
+  // Check if Razorpay is loaded (defer to avoid blocking initial render)
+  useEffect(() => {
+    // Defer Razorpay check until after page load
+    const checkRazorpay = () => {
+      if (window.Razorpay) {
+        setRazorpayLoaded(true);
+      } else {
+        // Retry after a short delay (non-blocking)
+        setTimeout(checkRazorpay, 100);
+      }
+    };
+
+    // Use requestIdleCallback if available, otherwise setTimeout
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(checkRazorpay, { timeout: 200 });
+    } else {
+      setTimeout(checkRazorpay, 100);
+    }
+  }, []);
+
+  // Load user data and cart
+  useEffect(() => {
+    const loadUserData = () => {
+      const storedUserData = localStorage.getItem('userData');
+      if (storedUserData) {
+        const userData = JSON.parse(storedUserData);
+        if (userData.phone) {
+          setUserPhone(userData.phone);
+        }
+        // Initialize contact details for editing
+        setContactDetails({
+          name: userData.name || '',
+          phone: userData.phone || ''
+        });
+      }
+    };
+    loadUserData();
+
+    // Refresh on focus to catch updates from profile page
+    window.addEventListener('focus', loadUserData);
+    return () => window.removeEventListener('focus', loadUserData);
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        if (listing) {
+          const item = catalogItem;
+          const price = item
+            ? (Number(item.price) || 0)
+            : (listing.displayPrice || listing.pricing?.basePrice || listing.pricing?.hourlyRate || listing.pricing?.dailyRate || 0);
+          const title = item?.title || listing.title;
+          setCartItems([{
+            id: item?.id || listing.id,
+            serviceListingId: listing.id,
+            catalogItemId: item?.id || null,
+            title,
+            price,
+            categoryTitle: listing.category?.title || '',
+            categoryIcon: listing.category?.icon || listing.portfolioPhotos?.[0] || '',
+            icon: item?.photoUrl || listing.portfolioPhotos?.[0] || '',
+            description: item?.description || listing.description || '',
+            serviceCount: 1,
+            card: {
+              title,
+              price,
+              imageUrl: item?.photoUrl || listing.portfolioPhotos?.[0] || '',
+              description: item?.description || listing.description || ''
+            }
+          }]);
+
+          const response = await userAuthService.getCheckoutData();
+          if (response.success) {
+            setVisitedFee(response.settings?.visitedCharges || response.settings?.convenienceFee || 0);
+            setGstPercentage(response.settings?.serviceGstPercentage || 18);
+            setAdvancePaymentPercent(response.settings?.advancePaymentPercent ?? 30);
+            setPlatformFeePercent(response.settings?.platformFeePercentage ?? 1);
+            if (response.user?.addresses?.length > 0) {
+              const defaultAddr = response.user.addresses.find(a => a.isDefault) || response.user.addresses[0];
+              setAddress(defaultAddr.addressLine1);
+              setHouseNumber(defaultAddr.addressLine2 || '');
+              setAddressDetails({
+                address: defaultAddr.addressLine1,
+                lat: defaultAddr.lat,
+                lng: defaultAddr.lng,
+                type: defaultAddr.type,
+                city: defaultAddr.city,
+                state: defaultAddr.state,
+                pincode: defaultAddr.pincode
+              });
+            }
+          }
+        } else if (plan) {
+          setCartItems([{
+            id: plan.id,
+            name: plan.name,
+            price: plan.price,
+            description: plan.description,
+            isPlan: true,
+            serviceCount: 1
+          }]);
+
+          // Still need config and address for plan checkout
+          const response = await userAuthService.getCheckoutData();
+          if (response.success) {
+            setVisitedFee(0);
+            setGstPercentage(response.settings?.serviceGstPercentage || 18);
+            setAdvancePaymentPercent(response.settings?.advancePaymentPercent ?? 30);
+            setPlatformFeePercent(response.settings?.platformFeePercentage ?? 1);
+
+            if (response.user?.addresses?.length > 0) {
+              const defaultAddr = response.user.addresses.find(a => a.isDefault) || response.user.addresses[0];
+              setAddress(defaultAddr.addressLine1);
+              setHouseNumber(defaultAddr.addressLine2 || '');
+              setAddressDetails({
+                address: defaultAddr.addressLine1,
+                lat: defaultAddr.lat,
+                lng: defaultAddr.lng,
+                type: defaultAddr.type,
+                city: defaultAddr.city,
+                state: defaultAddr.state,
+                pincode: defaultAddr.pincode
+              });
+            }
+          }
+        } else {
+          const response = await userAuthService.getCheckoutData();
+          if (response.success) {
+            // Set Config
+            setVisitedFee(response.settings?.visitedCharges || response.settings?.convenienceFee || 29);
+            setGstPercentage(response.settings?.serviceGstPercentage || 18);
+            setAdvancePaymentPercent(response.settings?.advancePaymentPercent ?? 30);
+            setPlatformFeePercent(response.settings?.platformFeePercentage ?? 1);
+
+            // Set Addresses
+            if (response.user?.addresses?.length > 0) {
+              const defaultAddr = response.user.addresses.find(a => a.isDefault) || response.user.addresses[0];
+              setAddress(defaultAddr.addressLine1);
+              setHouseNumber(defaultAddr.addressLine2 || '');
+              setAddressDetails({
+                address: defaultAddr.addressLine1,
+                lat: defaultAddr.lat,
+                lng: defaultAddr.lng,
+                type: defaultAddr.type,
+                city: defaultAddr.city,
+                state: defaultAddr.state,
+                pincode: defaultAddr.pincode
+              });
+            }
+
+            // Set Cart Items
+            let items = response.cartItems || [];
+            if (category) {
+              const normalizedCategory = category.toLowerCase().trim();
+              items = items.filter(item => {
+                const itemCat = (item.category || 'Other').toLowerCase().trim();
+                return itemCat === normalizedCategory;
+              });
+            }
+            setCartItems(items);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load checkout data', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [category, plan, listing, catalogItem]);
+
+  const loadCart = async () => {
+    try {
+      setLoading(true);
+      const response = await cartService.getCart();
+      if (response.success) {
+        let items = response.data || [];
+        if (category) {
+          const normalizedCategory = category.toLowerCase().trim();
+          items = items.filter(item => {
+            const itemCat = (item.category || 'Other').toLowerCase().trim();
+            return itemCat === normalizedCategory;
+          });
+        }
+        setCartItems(items);
+      } else {
+        setCartItems([]);
+      }
+    } catch (error) {
+      setCartItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cartCount = cartItems.length;
+
+  const handleBack = () => {
+    navigate(-1);
+  };
+
+  const handleQuantityChange = async (itemId, change) => {
+    try {
+      const item = cartItems.find(i => (i._id || i.id) === itemId);
+      if (!item) return;
+
+      const newCount = Math.max(1, (item.serviceCount || 1) + change);
+      const response = await cartService.updateItem(itemId, newCount);
+
+      if (response.success) {
+        // Refresh global cart badge
+        fetchCartGlobal();
+
+        // Reload cart and filter by category
+        const cartResponse = await cartService.getCart();
+        if (cartResponse.success) {
+          let items = cartResponse.data || [];
+          if (category) {
+            const normalizedCategory = category.toLowerCase().trim();
+            items = items.filter(item => {
+              const itemCat = (item.category || 'Other').toLowerCase().trim();
+              return itemCat === normalizedCategory;
+            });
+          }
+          setCartItems(items);
+        }
+      } else {
+        toast.error(response.message || 'Failed to update quantity');
+      }
+    } catch (error) {
+      toast.error('Failed to update quantity');
+    }
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    try {
+      const response = await cartService.removeItem(itemId);
+      if (response.success) {
+        toast.success('Item removed');
+        // Refresh global cart badge
+        fetchCartGlobal();
+        loadCart();
+      } else {
+        toast.error(response.message || 'Failed to remove item');
+      }
+    } catch (error) {
+      toast.error('Failed to remove item');
+    }
+  };
+
+
+
+  const getAddressComponent = (type) => {
+    return addressDetails?.components?.find(c => c.types.includes(type))?.long_name || '';
+  };
+
+  const handleProceed = async () => {
+    // Validation
+    if (bookingType === 'instant') {
+      if (!addressDetails) {
+        setShowAddressModal(true);
+        return;
+      }
+    } else {
+      if (!addressDetails || !selectedDate || !selectedTime) {
+        if (!addressDetails) setShowAddressModal(true);
+        else if (!selectedDate || !selectedTime) setShowTimeSlotModal(true);
+        return;
+      }
+    }
+
+    try {
+      setShowVendorModal(true);
+      setCurrentStep('searching');
+
+      const firstItem = cartItems[0];
+      if (!firstItem) {
+        toast.error('Your cart is empty');
+        return;
+      }
+      const serviceId = typeof firstItem.serviceId === 'object'
+        ? firstItem.serviceId._id || firstItem.serviceId.id
+        : firstItem.serviceId;
+
+      const bookedItemsData = cartItems.map(item => ({
+        brandName: item.sectionTitle || item.brand || '',
+        brandIcon: item.sectionIcon || null,
+        card: {
+          title: item.card?.title || item.title,
+          subtitle: item.card?.subtitle || item.description || '',
+          price: item.card?.price || item.price || 0,
+          originalPrice: item.card?.originalPrice || item.originalPrice || null,
+          duration: item.card?.duration || item.duration || '',
+          description: item.card?.description || item.description || '',
+          imageUrl: item.card?.imageUrl || item.icon || '',
+          features: item.card?.features || []
+        },
+        quantity: item.serviceCount || 1
+      }));
+
+      // Calculate Scheduled Data for Instant
+      let finalDate = selectedDate;
+      let finalTime = selectedTime;
+      let finalTimeSlot = {
+        start: selectedTime,
+        end: getTimeSlots().find(slot => slot.value === selectedTime)?.end || selectedTime
+      };
+
+      if (bookingType === 'instant') {
+        const now = new Date();
+        finalDate = now;
+        finalTime = "ASAP";
+        finalTimeSlot = { start: "Now", end: "45 mins" };
+      }
+
+      const response = await bookingService.create({
+        bookingType, // 'instant' or 'scheduled'
+        ...(firstItem.serviceListingId
+          ? { serviceListingId: firstItem.serviceListingId, catalogItemId: firstItem.catalogItemId || undefined }
+          : { serviceId }),
+        address: {
+          type: addressDetails?.type || 'home',
+          addressLine1: addressDetails?.addressLine1 || address,
+          addressLine2: houseNumber,
+          city: addressDetails?.city || getAddressComponent('locality') || getAddressComponent('administrative_area_level_2') || 'City',
+          state: addressDetails?.state || getAddressComponent('administrative_area_level_1') || 'State',
+          pincode: addressDetails?.pincode || getAddressComponent('postal_code') || '000000',
+          lat: addressDetails?.lat,
+          lng: addressDetails?.lng
+        },
+        scheduledDate: finalDate, // Date object
+        scheduledTime: bookingType === 'instant' ? "ASAP" : (getTimeSlots().find(slot => slot.value === finalTime)?.display || finalTime),
+        timeSlot: finalTimeSlot,
+        amount: amountToPay,
+
+        // Pass Full Breakdown to Backend
+        basePrice: totalOriginalPrice,
+        discount: savings,
+        tax: taxesAndFee,
+        visitationFee: finalVisitedFee,
+
+        // Metadata for better data capture
+        serviceCategory: firstItem.categoryTitle || firstItem.category || 'General',
+        categoryIcon: firstItem.categoryIcon || firstItem.icon || null,
+        brandName: firstItem.sectionTitle || firstItem.brand || '',
+        brandIcon: firstItem.sectionIcon || null,
+
+        contactDetails: {
+          name: contactDetails.name,
+          phone: contactDetails.phone.length === 10 && !contactDetails.phone.includes('+') ? `+91${contactDetails.phone}` : contactDetails.phone
+        },
+
+        paymentMethod: 'online',
+        bookedItems: bookedItemsData
+      });
+
+      if (response.success) {
+        setBookingRequest(response.data);
+
+        // If the backend returns an assigned vendor immediately (rare but possible)
+        if (response.data.vendorId && (response.data.status === 'ACCEPTED' || response.data.status === 'ASSIGNED')) {
+          setCurrentStep('accepted');
+          setAcceptedVendor({
+            ...(response.data.vendorId || {}),
+            price: response.data.finalAmount || amountToPay,
+            distance: 'within 5km', // default
+            estimatedTime: '15-30 min'
+          });
+          setSearchingVendors(false); // Finished search
+        } else {
+          // Normal flow: Entered pooling/searching
+          setCurrentStep('waiting'); // Waiting for vendor acceptance
+          // Keep searchingVendors = true to disable buttons and show progress
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to initiate booking request. Please try again.');
+      setShowVendorModal(false);
+      setSearchingVendors(false);
+    }
+  };
+
+
+  // Listen for real-time vendor acceptance
+  useEffect(() => {
+    if (currentStep !== 'waiting' || !bookingRequest) return;
+
+    const socketUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
+    const socket = io(socketUrl, {
+      auth: { token: localStorage.getItem('accessToken') },
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+    });
+
+    socket.on('connect_error', (err) => {
+    });
+
+    socket.on('booking_accepted', (data) => {
+      if (data.bookingId === bookingRequest._id) {
+
+        // Construct vendor object from event data
+        // Note: Real backend should send full details, falling back to defaults for display
+        const vendorData = {
+          id: data.vendor.id,
+          name: data.vendor.name || 'Vendor',
+          businessName: data.vendor.businessName || 'Service Provider',
+          rating: 4.8, // Default if not sent
+          distance: 'Nearby', // Default if not sent
+          estimatedTime: '15-20 mins',
+          price: bookingRequest.amount
+        };
+
+        setAcceptedVendor(vendorData);
+        setCurrentStep('accepted');
+        setSearchingVendors(false);
+        toast.success(`${vendorData.businessName} accepted your booking!`);
+
+        // Close modal after 2 seconds and navigate to confirmation
+        setTimeout(() => {
+          setShowVendorModal(false);
+          navigate(`/user/booking-confirmation/${bookingRequest._id}`, {
+            replace: true
+          });
+        }, 2000);
+      }
+    });
+
+    socket.on('booking_search_failed', (data) => {
+      if (data.bookingId === bookingRequest._id) {
+        setSearchingVendors(false);
+        setCurrentStep('failed');
+        toast.error(data.message || 'No vendors available at the moment.');
+
+        // Auto-cancel and refresh on failure
+        const handleAutoCancel = async () => {
+          try {
+            await bookingService.cancel(bookingRequest._id, 'No vendors found after search timeout');
+            setTimeout(() => {
+              window.location.reload();
+            }, 3000); // 3 second delay to let the user see the error
+          } catch (err) {
+            console.error('Auto-cancel failed:', err);
+            setTimeout(() => {
+              window.location.reload();
+            }, 3000);
+          }
+        };
+        handleAutoCancel();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentStep, bookingRequest]);
+
+  // Catalog: show nearby list → pick one vendor. Listing: send direct to listing provider.
+  const handleSearchVendors = async () => {
+    try {
+      if (bookingType === 'scheduled') {
+        if (!selectedDate || !selectedTime) {
+          toast.error('Please select time slot');
+          setShowTimeSlotModal(true);
+          return;
+        }
+        if (!addressDetails) {
+          toast.error('Please select address');
+          setShowAddressModal(true);
+          return;
+        }
+      } else if (!addressDetails) {
+        toast.error('Please select address');
+        setShowAddressModal(true);
+        return;
+      }
+
+      if (cartItems.length === 0 && !bookingRequest) {
+        toast.error('Cart is empty');
+        return;
+      }
+
+      const firstItem = cartItems[0];
+      if (!firstItem.serviceId && !firstItem.serviceListingId) {
+        toast.error('Service information missing. Please try again.');
+        return;
+      }
+
+      const isProviderRequest = Boolean(firstItem.serviceListingId);
+
+      // Listing booking: send request straight to that provider
+      if (isProviderRequest) {
+        setSearchingVendors(true);
+        toast.loading('Sending request to provider...');
+        const booking = await createCatalogOrListingBooking(null);
+        toast.dismiss();
+        if (!booking) {
+          setSearchingVendors(false);
+          return;
+        }
+        try {
+          if (category) await removeCategoryGlobal(category);
+          else await clearCartGlobal();
+          setCartItems([]);
+        } catch (err) {
+          console.error('Failed to clear cart', err);
+        }
+        toast.success('Request sent! Waiting for provider to accept.');
+        navigate(`/user/booking-confirmation/${booking._id || booking.id}`);
+        setSearchingVendors(false);
+        return;
+      }
+
+      // Catalog: open picker and load nearby vendors — do not broadcast yet
+      setShowVendorModal(true);
+      setCurrentStep('searching');
+      setSearchingVendors(true);
+      setLoadingNearbyVendors(true);
+      setNearbyVendors([]);
+      setAcceptedVendor(null);
+
+      const serviceId = typeof firstItem.serviceId === 'object'
+        ? firstItem.serviceId._id || firstItem.serviceId.id
+        : firstItem.serviceId;
+
+      try {
+        const res = await bookingService.getNearbyVendors({
+          serviceId,
+          lat: addressDetails?.lat || null,
+          lng: addressDetails?.lng || null,
+          city: addressDetails?.city || null,
+          paymentMethod: amountToPay === 0 ? 'plan_benefit' : 'pay_at_home'
+        });
+        const list = res?.data?.vendors || [];
+        setNearbyVendors(list);
+        if (list.length === 0) {
+          toast.error('No providers nearby for this service.');
+        }
+      } catch (err) {
+        console.error('Nearby vendors error:', err);
+        toast.error('Could not load nearby providers.');
+        setNearbyVendors([]);
+      } finally {
+        setLoadingNearbyVendors(false);
+        setSearchingVendors(false);
+      }
+    } catch (error) {
+      toast.dismiss();
+      console.error('Search vendors error:', error);
+      toast.error('Failed to search for vendors. Please try again.');
+      setCurrentStep('details');
+      setSearchingVendors(false);
+      setShowVendorModal(false);
+    }
+  };
+
+  const buildBookingPayload = (selectedVendorId) => {
+    const firstItem = cartItems[0];
+    const serviceId = typeof firstItem.serviceId === 'object'
+      ? firstItem.serviceId._id || firstItem.serviceId.id
+      : firstItem.serviceId;
+
+    const addressObj = {
+      type: 'home',
+      addressLine1: address,
+      addressLine2: houseNumber,
+      city: addressDetails?.city || getAddressComponent('locality') || getAddressComponent('administrative_area_level_2') || 'City',
+      state: addressDetails?.state || getAddressComponent('administrative_area_level_1') || 'State',
+      pincode: addressDetails?.pincode || getAddressComponent('postal_code') || '123456',
+      landmark: addressDetails?.landmark || '',
+      lat: addressDetails?.lat || null,
+      lng: addressDetails?.lng || null
+    };
+
+    let finalDate = selectedDate;
+    let finalTimeDisplay = selectedTime;
+    let timeSlotObj = {
+      start: selectedTime,
+      end: getTimeSlots().find(slot => slot.value === selectedTime)?.end || selectedTime
+    };
+
+    if (bookingType === 'instant') {
+      finalDate = new Date();
+      finalTimeDisplay = 'ASAP';
+      timeSlotObj = { start: 'Now', end: '45 mins' };
+    } else {
+      finalTimeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
+    }
+
+    const bookedItemsData = cartItems.map(item => ({
+      brandName: item.sectionTitle || item.brand || '',
+      brandIcon: item.sectionIcon || null,
+      card: {
+        title: item.card?.title || item.title || 'Unknown Service',
+        subtitle: item.card?.subtitle || item.description || '',
+        price: item.card?.price || item.price || 0,
+        originalPrice: item.card?.originalPrice || item.originalPrice || null,
+        duration: item.card?.duration || item.duration || '',
+        description: item.card?.description || item.description || '',
+        imageUrl: item.card?.imageUrl || item.icon || '',
+        features: item.card?.features || []
+      },
+      quantity: item.serviceCount || 1
+    }));
+
+    return {
+      bookingType,
+      ...(firstItem.serviceListingId
+        ? { serviceListingId: firstItem.serviceListingId, catalogItemId: firstItem.catalogItemId || undefined }
+        : { serviceId, ...(selectedVendorId ? { vendorId: selectedVendorId } : {}) }),
+      address: addressObj,
+      scheduledDate: finalDate.toISOString(),
+      scheduledTime: finalTimeDisplay,
+      timeSlot: timeSlotObj,
+      paymentMethod: amountToPay === 0 ? 'plan_benefit' : 'pay_at_home',
+      amount: amountToPay,
+      basePrice: totalOriginalPrice,
+      discount: savings,
+      tax: taxesAndFee,
+      visitationFee: finalVisitedFee,
+      serviceCategory: firstItem.categoryTitle || firstItem.category || 'General',
+      categoryIcon: firstItem.categoryIcon || firstItem.icon || null,
+      brandName: firstItem.sectionTitle || firstItem.brand || '',
+      brandIcon: firstItem.sectionIcon || null,
+      bookedItems: bookedItemsData
+    };
+  };
+
+  const createCatalogOrListingBooking = async (selectedVendorId) => {
+    const bookingResponse = await bookingService.create(buildBookingPayload(selectedVendorId));
+    if (!bookingResponse.success) {
+      toast.error(bookingResponse.message || 'Failed to create booking');
+      return null;
+    }
+    const booking = bookingResponse.data;
+    setBookingRequest(booking);
+    return booking;
+  };
+
+  /** Customer picked a vendor from nearby list → send request only to them */
+  const handleSelectVendor = async (vendor) => {
+    if (!vendor?.id || sendingVendorRequest) return;
+    try {
+      setSendingVendorRequest(true);
+      setAcceptedVendor(vendor);
+      toast.loading('Sending request to provider...');
+
+      const booking = await createCatalogOrListingBooking(vendor.id);
+      toast.dismiss();
+
+      if (!booking) {
+        setCurrentStep('failed');
+        return;
+      }
+
+      try {
+        if (category) await removeCategoryGlobal(category);
+        else await clearCartGlobal();
+        setCartItems([]);
+      } catch (err) {
+        console.error('Failed to clear cart', err);
+      }
+
+      setCurrentStep('waiting');
+      toast.success(`Request sent to ${vendor.businessName || vendor.name}!`);
+      navigate(`/user/booking-confirmation/${booking._id || booking.id}`, {
+        state: { selectedVendor: vendor, isDirectVendorRequest: true }
+      });
+    } catch (error) {
+      toast.dismiss();
+      console.error('Select vendor error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to send request. Please try again.');
+      setCurrentStep('failed');
+    } finally {
+      setSendingVendorRequest(false);
+    }
+  };
+
+  // Proceed to payment after vendor acceptance
+  const handleOnlinePayment = async () => {
+    try {
+      if (!acceptedVendor || !bookingRequest) {
+        toast.error('No vendor selected or booking not created');
+        return;
+      }
+
+      // Create Razorpay order
+      toast.loading('Creating payment order...');
+      const orderResponse = await paymentService.createOrder(bookingRequest._id);
+
+      if (!orderResponse.success) {
+        toast.dismiss();
+        toast.error(orderResponse.message || 'Failed to create payment order');
+        return;
+      }
+
+      toast.dismiss();
+
+      // Get Razorpay key
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        toast.error('Razorpay key not configured');
+        return;
+      }
+
+      if (!window.Razorpay) {
+        toast.error('Razorpay SDK not loaded');
+        return;
+      }
+
+      const options = {
+        key: orderResponse.data.key || razorpayKey,
+        order_id: orderResponse.data.orderId,
+        name: branding.appName,
+        description: `Payment for ${bookingRequest.serviceName || 'service'}`,
+        handler: async function (response) {
+          try {
+            toast.loading('Verifying payment...');
+            const verifyResponse = await paymentService.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            toast.dismiss();
+
+            if (verifyResponse.success) {
+              toast.success('Payment successful!');
+
+              // Clear cart (or just category items)
+              try {
+                if (category) {
+                  await removeCategoryGlobal(category);
+                } else {
+                  await clearCartGlobal();
+                }
+                setCartItems([]);
+              } catch (error) {
+              }
+
+              // Navigate to booking confirmation
+              navigate(`/user/booking-confirmation/${bookingRequest._id}`, {
+                replace: true
+              });
+            } else {
+              toast.error(verifyResponse.message || 'Payment verification failed');
+            }
+          } catch (error) {
+            toast.dismiss();
+            toast.error('Failed to verify payment');
+          }
+        },
+        prefill: {
+          name: contactDetails.name || JSON.parse(localStorage.getItem('userData'))?.name || 'User',
+          email: JSON.parse(localStorage.getItem('userData'))?.email || '',
+          contact: contactDetails.phone || userPhone
+        },
+        theme: {
+          color: themeColors.button
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function (response) {
+        toast.dismiss();
+        toast.error(`Payment failed: ${response.error.description || 'Unknown error'}`);
+      });
+      razorpay.open();
+
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to process payment');
+    }
+  };
+
+  const handlePayAtHome = async () => {
+    try {
+      if (!bookingRequest) return;
+      toast.loading('Confirming booking...');
+      const response = await paymentService.confirmPayAtHome(bookingRequest._id);
+      toast.dismiss();
+
+      if (response.success) {
+        toast.success('Booking confirmed!');
+        // Clear cart (or just category items)
+        try {
+          if (category) {
+            await removeCategoryGlobal(category);
+          } else {
+            await clearCartGlobal();
+          }
+          setCartItems([]);
+        } catch (error) {
+        }
+        // Navigate to booking confirmation
+        navigate(`/user/booking-confirmation/${bookingRequest._id}`, {
+          replace: true
+        });
+      } else {
+        toast.error(response.message || 'Failed to confirm booking');
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to process request');
+    }
+  };
+
+  const handlePayment = async () => {
+    if (totalAmount === 0) {
+      // Free booking covered by plan
+      toast.success('Booking confirmed!');
+      // Clear cart
+      try {
+        await clearCartGlobal();
+        setCartItems([]);
+      } catch (error) { }
+
+      // Navigate
+      if (bookingRequest) {
+        navigate(`/user/booking-confirmation/${bookingRequest._id}`, { replace: true });
+      }
+    } else if (paymentMethod === 'online') {
+      await handleOnlinePayment();
+    } else {
+      await handlePayAtHome();
+    }
+  };
+
+  const handleAddressSave = async (savedHouseNumber, locationObj) => {
+    setHouseNumber(savedHouseNumber);
+    if (locationObj) {
+      setAddress(locationObj.address);
+      setAddressDetails(locationObj);
+    }
+    setShowAddressModal(false);
+
+    // Save to profile
+    if (locationObj) {
+      try {
+        const getComp = (type) => locationObj.components?.find(c => c.types.includes(type))?.long_name || '';
+
+        const newAddress = {
+          type: 'home',
+          addressLine1: locationObj.address,
+          addressLine2: savedHouseNumber,
+          city: getComp('locality') || getComp('administrative_area_level_2') || 'City',
+          state: getComp('administrative_area_level_1') || 'State',
+          pincode: getComp('postal_code') || '000000',
+          lat: locationObj.lat,
+          lng: locationObj.lng,
+          isDefault: true
+        };
+
+        const response = await userAuthService.getProfile();
+        if (response.success && response.user) {
+          const updatedAddresses = [newAddress]; // Always replace with single address
+          await userAuthService.updateProfile({ addresses: updatedAddresses });
+          toast.success('Address updated in profile!');
+        }
+      } catch (e) {
+        console.error('Failed to save address to profile', e);
+      }
+    }
+
+    if (bookingType === 'scheduled') {
+      setShowTimeSlotModal(true);
+    }
+  };
+
+  const handleTimeSlotSave = (date, time) => {
+    setSelectedDate(date);
+    setSelectedTime(time);
+    setShowTimeSlotModal(false);
+  };
+
+  const handleCartClick = () => {
+    if (plan) return; // Disable cart click for plan
+    navigate('/user/cart');
+  };
+
+  // Fetch plan upgrade details if applicable
+  const [upgradePreview, setUpgradePreview] = useState(null);
+  const isUpgrade = location.state?.isUpgrade;
+
+  useEffect(() => {
+    if (plan && isUpgrade) {
+      const fetchUpgradeDetails = async () => {
+        try {
+          const res = await paymentService.getUpgradeDetails(plan.id);
+          if (res.success) {
+            setUpgradePreview(res.data);
+          }
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to calculate upgrade price');
+        }
+      };
+      fetchUpgradeDetails();
+    }
+  }, [plan, isUpgrade]);
+
+  const handlePlanPayment = async () => {
+    try {
+      if (!razorpayLoaded) {
+        toast.error('Payment gateway not ready');
+        return;
+      }
+
+      const response = await paymentService.createPlanOrder(plan.id);
+      if (response.success) {
+        const { orderId, amount, key } = response.data;
+
+        const options = {
+          key,
+          amount: amount * 100,
+          currency: 'INR',
+          name: branding.appName,
+          description: `Payment for ${plan.name} ${isUpgrade ? '(Upgrade)' : ''}`,
+          order_id: orderId,
+          handler: async (response) => {
+            try {
+              await paymentService.verifyPlanPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                planId: plan.id
+              });
+              toast.success('Subscription activated successfully!');
+              navigate('/user');
+            } catch (e) {
+              toast.error('Verification failed');
+            }
+          },
+          prefill: {
+            contact: userPhone
+          },
+          theme: {
+            color: themeColors.primary
+          }
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Payment initiation failed');
+    }
+  };
+
+  // Fetch plan and user profile to determine discounts
+  useEffect(() => {
+    const fetchBenefits = async () => {
+      try {
+        const [plansRes, userRes] = await Promise.all([
+          getPlans(),
+          userAuthService.getProfile(), // Ensure we have latest status
+        ]);
+
+        if (plansRes.success && userRes.success && userRes.user?.plans?.isActive) {
+          const userPlanName = userRes.user.plans.name;
+          const activePlan = plansRes.data.find(p => p.name === userPlanName);
+
+          if (activePlan) {
+            setPlanBenefits({
+              name: activePlan.name,
+              freeCategories: activePlan.freeCategories || [],
+              freeBrands: activePlan.freeBrands || [],
+              freeServices: activePlan.freeServices || []
+            });
+
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load plan benefits', e);
+      }
+    };
+
+    // Only fetch if not a plan purchase (standard checkout)
+    if (!plan) {
+      fetchBenefits();
+    }
+  }, [plan]);
+
+  const [planBenefits, setPlanBenefits] = useState({ name: '', freeCategories: [], freeBrands: [], freeServices: [] });
+
+  // Helper to normalize MongoDB IDs (handles strings, objects with _id, and $oid)
+  const normalizeId = (id) => {
+    if (!id) return null;
+    if (typeof id === 'string') return id;
+    if (id.$oid) return id.$oid;
+    if (id._id) return normalizeId(id._id);
+    return String(id);
+  };
+
+  // Calculate totals with Plan Benefits
+  const calculateItemPrice = (item) => {
+    if (plan) return item.price || 0; // Plan purchase
+
+    const itemCatId = normalizeId(item.categoryId);
+    const itemBrandId = normalizeId(item.brandId || item.sectionId);
+    const itemServiceId = normalizeId(item.serviceId);
+
+    // Check if free
+    const isFreeCategory = itemCatId && planBenefits.freeCategories.some(cat => {
+      return normalizeId(cat) === itemCatId;
+    });
+
+    const isFreeBrand = itemBrandId && planBenefits.freeBrands.some(brand => {
+      return normalizeId(brand) === itemBrandId;
+    });
+
+    const isFreeService = itemServiceId && planBenefits.freeServices.some(svc => {
+      return normalizeId(svc) === itemServiceId;
+    });
+
+    if (isFreeCategory || isFreeBrand || isFreeService) {
+      return 0;
+    }
+    return item.price || 0;
+  };
+
+  const itemTotal = cartItems.reduce((sum, item) => sum + calculateItemPrice(item), 0);
+  // Calculate savings including Plan Savings
+  const totalOriginalPrice = cartItems.reduce((sum, item) => {
+    const original = (item.originalPrice || item.unitPrice || (item.price / (item.serviceCount || 1))) * (item.serviceCount || 1);
+    // If priced 0, original is huge saving
+    return sum + original;
+  }, 0);
+
+  const savings = totalOriginalPrice - itemTotal;
+  const platformFee = itemTotal === 0 ? 0 : Math.round((itemTotal * platformFeePercent) / 100);
+  const taxesAndFee = Math.round((itemTotal * gstPercentage) / 100);
+  const finalVisitedFee = itemTotal === 0 ? 0 : visitedFee;
+
+  const totalAmount = itemTotal + taxesAndFee + platformFee + finalVisitedFee;
+  const amountToPay = totalAmount;
+
+  const listingAdvanceConfig = useMemo(() => {
+    if (!isListingBooking || !listing) {
+      return { requireAdvancePayment: false, advancePaymentPercent: 0 };
+    }
+    return resolveAdvancePaymentConfig({
+      settings: { advancePaymentPercent },
+      category: listing.category
+    });
+  }, [isListingBooking, listing, advancePaymentPercent]);
+
+  const requiresAdvance = listingAdvanceConfig.requireAdvancePayment;
+  const effectiveAdvancePct = listingAdvanceConfig.advancePaymentPercent;
+  const advanceDue = requiresAdvance ? Math.round((totalAmount * effectiveAdvancePct) / 100) : 0;
+  const balanceDue = requiresAdvance ? Math.max(0, totalAmount - advanceDue) : totalAmount;
+
+  const displayTax = totalAmount === 0 ? Math.round((totalOriginalPrice * gstPercentage) / 100) : taxesAndFee;
+  const displayPlatformFee = totalAmount === 0 ? Math.round((totalOriginalPrice * platformFeePercent) / 100) : platformFee;
+  const displayFee = totalAmount === 0 ? visitedFee : finalVisitedFee;
+  const displaySavings = totalAmount === 0 ? (totalOriginalPrice + displayTax + displayPlatformFee + displayFee) : savings;
+
+  // Date and time slot helper functions
+  const getDates = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const getTimeSlots = () => {
+    const allSlots = [
+      { value: '09:00', end: '10:00', display: '9:00 AM' },
+      { value: '10:00', end: '11:00', display: '10:00 AM' },
+      { value: '11:00', end: '12:00', display: '11:00 AM' },
+      { value: '12:00', end: '13:00', display: '12:00 PM' },
+      { value: '13:00', end: '14:00', display: '1:00 PM' },
+      { value: '14:00', end: '15:00', display: '2:00 PM' },
+      { value: '15:00', end: '16:00', display: '3:00 PM' },
+      { value: '16:00', end: '17:00', display: '4:00 PM' },
+      { value: '17:00', end: '18:00', display: '5:00 PM' },
+      { value: '18:00', end: '19:00', display: '6:00 PM' },
+      { value: '19:00', end: '20:00', display: '7:00 PM' },
+      { value: '20:00', end: '21:00', display: '8:00 PM' },
+    ];
+
+    // If today is selected, filter out past time slots
+    const now = new Date();
+    const isToday = selectedDate && selectedDate.toDateString() === now.toDateString();
+
+    if (!isToday) {
+      return allSlots;
+    }
+
+    // Get current hour + 1 (minimum 1 hour buffer for vendors to accept)
+    const currentHour = now.getHours();
+    const minHour = currentHour + 1;
+
+    return allSlots.filter(slot => {
+      const slotHour = parseInt(slot.value.split(':')[0], 10);
+      return slotHour >= minHour;
+    });
+  };
+
+  const formatDate = (date) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return {
+      day: days[date.getDay()],
+      date: date.getDate(),
+    };
+  };
+
+
+
+  const isDateSelected = (date) => {
+    return selectedDate && date.toDateString() === selectedDate.toDateString();
+  };
+
+  const isTimeSelected = (time) => {
+    return selectedTime === time;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white pb-32 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" style={{ borderColor: themeColors.button }}></div>
+          <p className="text-gray-500">Loading checkout details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0 && currentStep === 'details' && !searchingVendors && !showVendorModal) {
+    return (
+      <div className="min-h-screen bg-white pb-32">
+        <header className="bg-white">
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <FiArrowLeft className="w-6 h-6 text-black" />
+              </button>
+              <h1 className="text-xl font-bold text-black">Your cart</h1>
+            </div>
+          </div>
+          <div className="border-b border-gray-200"></div>
+        </header>
+        <main className="px-4 py-4">
+          <div className="flex flex-col items-center justify-center py-20">
+            <FiShoppingCart className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-gray-500 text-lg font-medium">Your cart is empty</p>
+            <p className="text-gray-400 text-sm mt-2">Add services to get started</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white pb-80">
+      {/* Header */}
+      <header className="bg-white">
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <FiArrowLeft className="w-6 h-6 text-black" />
+            </button>
+            <h1 className="text-xl font-bold text-black">
+              {category ? `${category} Checkout` : 'Your cart'}
+            </h1>
+          </div>
+        </div>
+        <div className="border-b border-gray-200"></div>
+      </header>
+
+      <main className="px-4 py-4">
+        {/* Savings Banner */}
+        {savings > 0 && (
+          <div className="bg-green-50 border border-green-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-green-200">
+                <MdStar className="text-white w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-green-600 uppercase tracking-wider">Smart Choice!</p>
+                <p className="text-sm font-black text-slate-900">
+                  You're saving ₹{savings.toLocaleString('en-IN')}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white px-3 py-1 rounded-full shadow-sm border border-green-100">
+              <span className="text-[10px] font-black text-green-600">BEST PRICE</span>
+            </div>
+          </div>
+        )}
+
+        {/* Selected Provider — listing bookings */}
+        {isListingBooking && listing?.provider && (
+          <div className="mb-4 p-4 rounded-2xl border border-primary-100 bg-primary-50/50">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary-600 mb-2">Your selected provider</p>
+            <div className="flex items-center gap-3">
+              {listing.provider.photo ? (
+                <img src={listing.provider.photo} alt="" className="w-12 h-12 rounded-xl object-cover border border-white shadow-sm" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-primary-200 flex items-center justify-center text-primary-700 font-black">
+                  {(listing.provider.name || 'P').charAt(0)}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-slate-900 truncate">{listing.provider.name}</p>
+                <p className="text-xs text-slate-500">{listing.category?.title || listing.title}</p>
+                {listing.provider.rating && (
+                  <p className="text-xs text-amber-600 font-bold mt-0.5">★ {listing.provider.rating} · {listing.provider.reviews || 0} reviews</p>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-3 leading-relaxed">
+              Request goes directly to this provider.
+              {requiresAdvance
+                ? ` After accept, you pay ${effectiveAdvancePct}% advance — rest after service.`
+                : ' Full payment after service completion.'}
+            </p>
+          </div>
+        )}
+
+        {/* Cart Items */}
+        <div className="space-y-4 mb-4">
+          {cartItems.map((item) => {
+            const brandName = item.brand || item.sectionTitle;
+            const categoryName = item.categoryTitle || item.category;
+
+            return (
+              <div key={item._id} className="bg-white border border-gray-100 rounded-[24px] p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                <div className="flex justify-between items-start mb-3">
+                  {/* Brand Header */}
+                  {(brandName || categoryName) ? (
+                    <div className="flex items-center gap-2">
+                      {item.sectionIcon ? (
+                        <img src={toAssetUrl(item.sectionIcon)} className="w-6 h-6 rounded-lg object-cover border border-gray-100" alt="" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-lg bg-gray-50 flex items-center justify-center text-[11px] font-black text-gray-500 border border-gray-100">
+                          {(brandName || "B").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex flex-col leading-tight">
+                        {brandName && <span className="text-[12px] font-black text-gray-800">{brandName}</span>}
+                        {categoryName && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{categoryName}</span>}
+                      </div>
+                    </div>
+                  ) : <div />}
+
+                  {!item.isPlan && (
+                    <button
+                      onClick={() => handleRemoveItem(item._id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors active:scale-95"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex gap-4">
+                  {/* Image */}
+                  {(item.photoUrl || item.image || item.icon) ? (
+                    <img src={toAssetUrl(item.photoUrl || item.image || item.icon)} alt="" className="w-[84px] h-[84px] rounded-[16px] object-cover bg-gray-50 shrink-0 border border-gray-100/50" />
+                  ) : (
+                    <div className="w-[84px] h-[84px] rounded-[16px] bg-gradient-to-br from-primary-50 to-indigo-50 flex items-center justify-center shrink-0 border border-gray-100/50">
+                      <span className="text-2xl font-black text-blue-200">{(item.title || 'P').charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0 py-0.5 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-[16px] font-black text-gray-900 leading-tight tracking-tight truncate">{item.title}</h3>
+                      {item.description && (
+                        <p className="text-[12px] text-gray-500 font-medium mt-1 line-clamp-1">{item.description}</p>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-3">
+                      {/* Price */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[18px] font-black text-[#016A54] tracking-tight">
+                          {calculateItemPrice(item) === 0 ? (
+                            <span className="text-green-600">Free</span>
+                          ) : (
+                            `₹${(item.price || 0).toLocaleString('en-IN')}`
+                          )}
+                        </span>
+                        {calculateItemPrice(item) === 0 && (
+                          <span className="text-[9px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200">
+                            WITH PLAN
+                          </span>
+                        )}
+                        {calculateItemPrice(item) > 0 && (() => {
+                          const unitPrice = item.unitPrice || (item.price / (item.serviceCount || 1));
+                          const unitOriginalPrice = item.originalPrice || unitPrice;
+                          const currentTotal = item.price;
+                          const originalTotal = unitOriginalPrice * (item.serviceCount || 1);
+                          if (originalTotal > currentTotal) {
+                            return (
+                              <span className="text-[12px] font-medium text-gray-400 line-through">
+                                ₹{originalTotal.toLocaleString('en-IN')}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+
+                      {/* Quantity Control */}
+                      {!item.isPlan && (
+                        <div className="flex items-center gap-2.5 bg-[#f8f9fc] border border-gray-100 rounded-[12px] p-1 shadow-sm shrink-0">
+                          <button
+                            onClick={() => handleQuantityChange(item._id, -1)}
+                            className="w-7 h-7 flex items-center justify-center bg-white rounded-[8px] shadow-sm text-gray-600 hover:text-gray-900 active:scale-95 transition-all"
+                          >
+                            <FiMinus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-4 text-center text-[13px] font-black text-gray-900">{item.serviceCount || 1}</span>
+                          <button
+                            onClick={() => handleQuantityChange(item._id, 1)}
+                            className="w-7 h-7 flex items-center justify-center bg-[#016A54] rounded-[8px] shadow-sm text-white hover:bg-[#122652] active:scale-95 transition-all"
+                          >
+                            <FiPlus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* ... */}
+
+
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FiPhone className="w-5 h-5 text-gray-600" />
+              <div>
+                <p className="text-sm font-medium text-black">{contactDetails.name || JSON.parse(localStorage.getItem('userData'))?.name || 'Verified Customer'}</p>
+                <p className="text-xs text-gray-600">{contactDetails.phone || userPhone || 'Loading...'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowContactModal(true)}
+              className="text-sm font-medium text-primary-500 hover:underline"
+            >
+              Change
+            </button>
+          </div>
+        </div>
+
+        {/* Payment Summary */}
+        <div className="bg-white border-2 border-neutral-100 rounded-2xl p-5 mb-6 shadow-sm overflow-hidden relative">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-secondary-500" />
+
+          <h3 className="text-lg font-bold text-neutral-900 mb-5 flex items-center gap-2">
+            <FiShoppingCart className="w-5 h-5 text-primary-500" />
+            Payment Summary
+          </h3>
+
+          <div className="space-y-3">
+            {/* Original Price (before plan) */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Item Total</span>
+              <span className="text-sm font-medium text-slate-900">
+                ₹{totalOriginalPrice.toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {/* Discount Line */}
+            {displaySavings > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-green-600">Discount</span>
+                <span className="text-sm font-medium text-green-600">-₹{displaySavings.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
+            {/* Upgrade Credit (for plan upgrades) */}
+            {upgradePreview && upgradePreview.credit > 0 && (
+              <div className="flex justify-between items-center text-green-600">
+                <span className="text-sm font-medium">Plan Credit</span>
+                <span className="text-sm font-bold">-₹{upgradePreview.credit.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
+            {/* Taxes */}
+            {displayTax > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">GST ({gstPercentage}%)</span>
+                <span className="text-sm font-medium text-slate-700">₹{displayTax.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
+            {/* Platform Fee */}
+            {displayPlatformFee > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Platform Fee ({platformFeePercent}%)</span>
+                <span className="text-sm font-medium text-slate-700">₹{displayPlatformFee.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
+            {/* Visited Fee */}
+            {displayFee > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Convenience Fee</span>
+                <span className="text-sm font-medium text-slate-700">₹{displayFee.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="border-t border-slate-200 pt-4 mt-2">
+              <div className="flex justify-between items-center">
+                <span className="text-base font-bold text-slate-900">Estimated Total</span>
+                <div className="flex flex-col items-end">
+                  {totalAmount === 0 ? (
+                    <>
+                      <span className="text-sm font-medium text-slate-400 line-through">
+                        ₹{Math.round(totalOriginalPrice + displayTax + displayPlatformFee + displayFee).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-xl font-black text-green-600">FREE</span>
+                    </>
+                  ) : (
+                    <span className="text-xl font-black text-slate-900">
+                      ₹{totalAmount.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {requiresAdvance && totalAmount > 0 && (
+                <div className="mt-3 pt-3 border-t border-dashed border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-primary-500 font-medium">Advance ({effectiveAdvancePct}% after accept)</span>
+                    <span className="font-bold text-primary-500">₹{advanceDue.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Balance (after service)</span>
+                    <span className="font-medium text-slate-700">₹{balanceDue.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              )}
+              {!requiresAdvance && isListingBooking && totalAmount > 0 && (
+                <p className="mt-2 text-xs text-slate-500">Full amount payable after service — no advance for this service.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Important Note regarding Base Price */}
+        <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-6 flex items-start gap-4 shadow-sm">
+          <div className="bg-primary-100 p-2 rounded-full shrink-0 mt-0.5">
+            <FiInfo className="w-5 h-5 text-primary-500" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-blue-900 mb-1">Note</h4>
+            <p className="text-sm text-blue-800 leading-relaxed font-medium">
+              This is a base booking cost. Additional service cost is decided by the vendor after service bill preparation.
+            </p>
+          </div>
+        </div>
+
+        {/* Free Plan Benefit Card */}
+        {totalAmount === 0 && (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-100/50 border border-green-200 rounded-2xl p-5 mb-6 relative overflow-hidden">
+            <div className="flex items-start gap-4 z-10 relative">
+              <div className="bg-green-500 rounded-full p-2 shadow-lg shadow-green-200 shrink-0">
+                <FiCheckCircle className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-green-800 mb-1">Covered by {planBenefits.name}</h3>
+                <p className="text-sm text-green-700 leading-relaxed font-medium opacity-90">
+                  You save <span className="font-bold">₹{Math.round(totalOriginalPrice + displayTax + displayPlatformFee + displayFee).toLocaleString('en-IN')}</span> on this booking!
+                  Your plan covers all costs.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancellation Policy */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <h3 className="text-base font-bold text-black mb-2">Cancellation policy</h3>
+          <p className="text-sm text-gray-700 mb-2">
+            Free cancellations if done more than 12 hrs before the service or if a professional isn't assigned. A fee will be charged otherwise.
+          </p>
+          <button
+            onClick={() => navigate('/user/cancellation-policy')}
+            className="text-sm font-medium text-primary-500 hover:underline"
+          >
+            Read full policy
+          </button>
+        </div>
+
+
+      </main>
+
+      {/* Bottom Action Button */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+
+        {/* Booking Type Toggle */}
+        {showBookingTypeToggle && (
+        <div className="px-4 pt-3 pb-0">
+          <div className="flex bg-neutral-100 p-1 rounded-xl mb-1">
+            <button
+              type="button"
+              onClick={() => setBookingType('instant')}
+              disabled={isListingBooking && listing && !isBookingTypeAllowed('instant', listing.bookingMode, listing.category?.bookingMode)}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${bookingType === 'instant' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-500'}`}
+            >
+              <span className="text-warning-500">⚡</span> Book
+            </button>
+            <button
+              type="button"
+              onClick={() => setBookingType('scheduled')}
+              disabled={isListingBooking && listing && !isBookingTypeAllowed('scheduled', listing.bookingMode, listing.category?.bookingMode)}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${bookingType === 'scheduled' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-500'}`}
+            >
+              <span>📅</span> Slot
+            </button>
+          </div>
+          {bookingType === 'instant' && !isListingBooking && (
+            <p className="text-xs text-center text-success-600 font-medium mt-1 mb-1">
+              <span className="font-bold">⚡ Priority Service:</span> Vendor arrives in ~45 mins
+            </p>
+          )}
+          {isListingBooking && bookingType === 'scheduled' && (
+            <p className="text-xs text-center text-violet-600 font-medium mt-1 mb-1">
+              <span className="font-bold">📅 Scheduled:</span> Request goes to your selected provider at chosen slot
+            </p>
+          )}
+          {isListingBooking && bookingType === 'instant' && (
+            <p className="text-xs text-center text-amber-600 font-medium mt-1 mb-1">
+              <span className="font-bold">⚡ Instant:</span> ASAP request to your selected provider
+            </p>
+          )}
+        </div>
+        )}
+        {!showBookingTypeToggle && isListingBooking && listingBookingOptions[0] && (
+          <div className="px-4 pt-3 pb-0">
+            <p className="text-xs text-center font-bold text-neutral-600 bg-neutral-100 rounded-xl py-2">
+              {listingBookingOptions[0].label}
+            </p>
+          </div>
+        )}
+
+        {/* Address and Slot Display */}
+        <div className="px-4 pt-2 pb-2 border-b border-neutral-100">
+          {(houseNumber || addressDetails) ? (
+            <div className="space-y-2.5">
+              {/* Address */}
+              <div 
+                className="flex items-start gap-2.5 cursor-pointer hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors"
+                onClick={() => setShowAddressModal(true)}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary-50">
+                  <FiHome className="w-4 h-4 text-primary-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-neutral-500 mb-0.5">Address</p>
+                  <p className="text-sm font-medium text-neutral-900 truncate">
+                    {houseNumber ? `${houseNumber}, ` : ''}{address || 'Select Address'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(true)}
+                  className="p-1.5 hover:bg-neutral-100 rounded-full transition-colors shrink-0 mt-0.5"
+                  aria-label="Edit address"
+                >
+                  <FiEdit2 className="w-4 h-4 text-neutral-600" />
+                </button>
+              </div>
+
+              {/* Time Slot (Only for Scheduled) */}
+              {bookingType === 'scheduled' && (
+                <div 
+                  className="flex items-start gap-2.5 cursor-pointer hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors"
+                  onClick={() => setShowTimeSlotModal(true)}
+                >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary-50">
+                    <FiClock className="w-4 h-4 text-primary-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-neutral-500 mb-0.5">Time Slot</p>
+                    <p className="text-sm font-medium text-neutral-900">
+                      {selectedDate ? (() => {
+                        const { day, date: dateNum } = formatDate(selectedDate);
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const month = monthNames[selectedDate.getMonth()];
+                        const timeStr = selectedTime && getTimeSlots().find(slot => slot.value === selectedTime)?.display ? ` • ${getTimeSlots().find(slot => slot.value === selectedTime).display}` : '';
+                        return `${day}, ${dateNum} ${month}${timeStr}`;
+                      })() : (
+                        <span className="text-neutral-400">Select Date & Time</span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTimeSlotModal(true)}
+                    className="p-1.5 hover:bg-neutral-100 rounded-full transition-colors shrink-0 mt-0.5"
+                    aria-label="Edit time slot"
+                  >
+                    <FiEdit2 className="w-4 h-4 text-neutral-600" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              onClick={() => setShowAddressModal(true)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setShowAddressModal(true); }}
+              role="button"
+              tabIndex={0}
+              className="flex items-center justify-between p-3 bg-error-50 border border-error-100 rounded-xl cursor-pointer active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-error-100 flex items-center justify-center shrink-0">
+                  <FiHome className="w-5 h-5 text-error-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-error-700">Delivery Address Missing</p>
+                  <p className="text-xs text-error-600">Please add address to see availability</p>
+                </div>
+              </div>
+              <FiEdit2 className="w-4 h-4 text-error-400" />
+            </div>
+          )}
+        </div>
+
+        {/* Payment method — shown when vendor accepted / payment step */}
+        {currentStep === 'payment' && totalAmount > 0 && (
+          <div className="px-4 pt-3 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">Payment method</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('online')}
+                className={`flex flex-col items-start gap-1.5 p-3 rounded-2xl border-2 text-left transition-all ${
+                  paymentMethod === 'online'
+                    ? 'border-primary-500 bg-primary-50 shadow-sm'
+                    : 'border-neutral-200 bg-white hover:border-neutral-300'
+                }`}
+              >
+                <FiSmartphone className={`w-5 h-5 ${paymentMethod === 'online' ? 'text-primary-500' : 'text-neutral-400'}`} />
+                <span className="text-sm font-bold text-neutral-900">Pay online</span>
+                <span className="text-[11px] text-neutral-500">UPI / Cards via Razorpay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('pay_at_home')}
+                className={`flex flex-col items-start gap-1.5 p-3 rounded-2xl border-2 text-left transition-all ${
+                  paymentMethod === 'pay_at_home'
+                    ? 'border-primary-500 bg-primary-50 shadow-sm'
+                    : 'border-neutral-200 bg-white hover:border-neutral-300'
+                }`}
+              >
+                <FiCreditCard className={`w-5 h-5 ${paymentMethod === 'pay_at_home' ? 'text-primary-500' : 'text-neutral-400'}`} />
+                <span className="text-sm font-bold text-neutral-900">Pay at home</span>
+                <span className="text-[11px] text-neutral-500">Cash after service</span>
+              </button>
+            </div>
+            {paymentMethod === 'online' && (
+              <Badge variant="info" size="sm">Secure checkout powered for {branding?.appName || APP_NAME}</Badge>
+            )}
+          </div>
+        )}
+
+        <div className="p-4">
+          <Button
+            fullWidth
+            size="xl"
+            variant="primary"
+            isLoading={searchingVendors}
+            disabled={searchingVendors}
+            onClick={plan ? handlePlanPayment :
+              (houseNumber || addressDetails) ?
+                (currentStep === 'payment' ? handlePayment : handleSearchVendors) :
+                handleProceed}
+            className="!bg-[#016A54] !bg-none !shadow-[#016A54]/25 hover:!bg-[#122652]"
+          >
+            {searchingVendors || loadingNearbyVendors ? (isListingBooking ? 'Sending request...' : 'Loading providers...') :
+              currentStep === 'payment' ? (totalAmount === 0 ? 'Confirm Booking (Free)' : (paymentMethod === 'online' ? 'Proceed to Pay' : 'Confirm Booking')) :
+                plan ? 'Proceed to Payment' :
+                  isListingBooking ? 'Send Request to Provider' :
+                  bookingType === 'instant' ? 'Choose nearby provider' :
+                    (selectedDate && selectedTime && houseNumber ?
+                      'Choose nearby provider' :
+                      (houseNumber || addressDetails) ? 'Select Time Slot' : 'Add address to proceed')}
+          </Button>
+        </div>
+      </div>
+
+      {/* Live Booking Status Card is rendered globally by UserRoutes */}
+
+      {/* Vendor Search Modal */}
+      <VendorSearchModal
+        isOpen={showVendorModal}
+        onClose={() => {
+          if (sendingVendorRequest) return;
+          setShowVendorModal(false);
+          if (currentStep === 'accepted') {
+            setCurrentStep('payment');
+          } else if (currentStep === 'failed' || currentStep === 'searching' || currentStep === 'waiting') {
+            setCurrentStep('details');
+          }
+        }}
+        currentStep={currentStep}
+        acceptedVendor={acceptedVendor}
+        vendors={nearbyVendors}
+        loadingVendors={loadingNearbyVendors}
+        sendingRequest={sendingVendorRequest}
+        onSelectVendor={handleSelectVendor}
+        onRetry={() => {
+          handleSearchVendors();
+        }}
+      />
+
+      {/* Contact Details Edit Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl animate-scale-in">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Update Contact Details</h3>
+            <p className="text-sm text-gray-500 mb-4">These details will be used for this booking only.</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Name</label>
+                <input
+                  type="text"
+                  value={contactDetails.name}
+                  onChange={(e) => setContactDetails(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  placeholder="Enter name"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Phone Number</label>
+                <div className="flex gap-2">
+                  <span className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 font-medium select-none">+91</span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={contactDetails.phone?.replace('+91', '')?.replace(/^\+91/, '') || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setContactDetails(prev => ({ ...prev, phone: val }));
+                    }}
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    placeholder="9999999999"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (contactDetails.name.length < 2) {
+                      toast.error('Please enter a valid name');
+                      return;
+                    }
+                    if (!contactDetails.phone || contactDetails.phone.length < 10) {
+                      toast.error('Please enter a valid 10-digit phone number');
+                      return;
+                    }
+                    setShowContactModal(false);
+                  }}
+                  className="py-3 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30 active:scale-95 transition-all"
+                  style={{ backgroundColor: themeColors.button }}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Selection Modal */}
+      <AddressSelectionModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        address={address}
+        houseNumber={houseNumber}
+        onHouseNumberChange={setHouseNumber}
+        onSave={handleAddressSave}
+      />
+
+      {/* Time Slot Modal */}
+      <TimeSlotModal
+        isOpen={showTimeSlotModal}
+        onClose={() => setShowTimeSlotModal(false)}
+        selectedDate={selectedDate}
+        selectedTime={selectedTime}
+        onDateSelect={setSelectedDate}
+        onTimeSelect={setSelectedTime}
+        onSave={handleTimeSlotSave}
+        getDates={getDates}
+        getTimeSlots={getTimeSlots}
+        formatDate={formatDate}
+        isDateSelected={isDateSelected}
+        isTimeSelected={isTimeSelected}
+      />
+    </div>
+  );
+};
+
+export default Checkout;
