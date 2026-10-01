@@ -24,8 +24,8 @@ const Profile = () => {
   };
 
   const menuItems = [
-    { id: 1, label: 'My Services', icon: FiLayers, path: '/vendor/my-services' },
-    { id: 1.5, label: 'Edit Service Form', icon: FiFileText, path: '/vendor/profile/service-form' },
+    { id: 1, label: 'Meri Dukaanein (Shop Listings)', icon: FiLayers, path: '/vendor/my-services' },
+    { id: 1.5, label: 'Dukaan Listing & Info', icon: FiFileText, path: '/vendor/add-service' },
     { id: 1.6, label: 'My Subscription', icon: FiPackage, path: '/vendor/subscription' },
     { id: 2, label: 'Wallet', icon: FaWallet, path: '/vendor/wallet' },
     { id: 5, label: 'My Ratings', icon: FiStar, path: '/vendor/my-ratings' },

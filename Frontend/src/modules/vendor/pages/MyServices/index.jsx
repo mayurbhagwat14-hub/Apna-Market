@@ -90,32 +90,32 @@ const MyServices = () => {
   return (
     <div className="min-h-screen bg-neutral-50 pb-20">
       <Header
-        title="My Services"
+        title="Meri Dukaanein (Shop Listings)"
         onBack={() => navigate('/vendor/dashboard')}
         rightAction={
           <button
             onClick={() => navigate('/vendor/add-service')}
             className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors border border-white/10"
           >
-            <FiPlus className="w-3.5 h-3.5" /><span>Add</span>
+            <FiPlus className="w-3.5 h-3.5" /><span>Add Dukaan</span>
           </button>
         }
       />
 
       <main className="p-4 max-w-xl mx-auto space-y-4">
         <div className="bg-white rounded-2xl border border-neutral-200 p-3.5 shadow-sm">
-          <p className="text-[11px] font-black text-neutral-800 uppercase tracking-wide">How it works</p>
+          <p className="text-[11px] font-black text-neutral-800 uppercase tracking-wide">Dukaan List Kaise Karein</p>
           <ol className="mt-2 space-y-1.5 text-[11px] text-neutral-600">
-            <li><span className="font-bold text-primary-700">1.</span> Pick any service category you provide</li>
-            <li><span className="font-bold text-primary-700">2.</span> Fill company / about details once</li>
-            <li><span className="font-bold text-primary-700">3.</span> Add packages under that service</li>
-            <li><span className="font-bold text-primary-700">4.</span> Edit details or add packages anytime — user panel pe sirf admin approve ke baad dikhega</li>
+            <li><span className="font-bold text-primary-700">1.</span> Apni dukaan ki category chuniye (Clothing, Shops, Kirana, etc.)</li>
+            <li><span className="font-bold text-primary-700">2.</span> Dukaan ka naam, pata/address, contact aur timings daalein</li>
+            <li><span className="font-bold text-primary-700">3.</span> Dukaan ki photos, advertisement banner aur active offers lagayein</li>
+            <li><span className="font-bold text-primary-700">4.</span> Apne kapde, designs ya products showcase karein</li>
           </ol>
         </div>
 
         <div className="flex flex-col gap-3">
           <p className="text-[11px] text-gray-500 font-bold tracking-wide uppercase px-1">
-            {services.length} service{services.length !== 1 ? 's' : ''} total
+            {services.length} Dukaan listing{services.length !== 1 ? 's' : ''} total
           </p>
 
           {services.length > 0 && (
@@ -148,17 +148,17 @@ const MyServices = () => {
             </div>
             <div>
               <h2 className="text-base font-black text-neutral-900">
-                {activeFilter === 'ALL' ? 'No Services Yet' : `No ${STATUS_CONFIG[activeFilter]?.label || ''} Services`}
+                {activeFilter === 'ALL' ? 'Koi Dukaan List Nahi Hai' : `No ${STATUS_CONFIG[activeFilter]?.label || ''} Listings`}
               </h2>
               <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">
-                Select a category, add your company details, then create packages customers can book.
+                Apni dukaan list karein, photos, offers aur kapde/designs upload karein taaki customers discover kar sakein.
               </p>
             </div>
             <button
               onClick={() => navigate('/vendor/add-service')}
               className="bg-primary-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl inline-flex items-center gap-2 shadow-md hover:bg-primary-700 active:scale-95 transition-all"
             >
-              <FiPlus /><span>Create Service</span>
+              <FiPlus /><span>Nayi Dukaan List Karein</span>
             </button>
           </div>
         ) : (

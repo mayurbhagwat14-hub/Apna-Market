@@ -7,12 +7,12 @@ export const LISTING_SECTIONS = {
     schemaKey: 'vendorFormSchema',
     answersKey: 'dynamicFormAnswers',
     icon: FiFileText,
-    defaultTitle: 'Service Details'
+    defaultTitle: 'Shop Details & Location'
   },
   menu: {
     type: 'menu',
     icon: FiLayers,
-    defaultTitle: 'Packages & Blocks'
+    defaultTitle: 'Designs & Products Showcase'
   },
   pricing: {
     schemaKey: 'pricingFormSchema',
@@ -24,37 +24,37 @@ export const LISTING_SECTIONS = {
     schemaKey: 'availabilityFormSchema',
     answersKey: 'availabilityFormAnswers',
     icon: FiClock,
-    defaultTitle: 'Availability'
+    defaultTitle: 'Store Timings'
   },
   serviceArea: {
     schemaKey: 'serviceAreaFormSchema',
     answersKey: 'serviceAreaFormAnswers',
     icon: FiMapPin,
-    defaultTitle: 'Service Area'
+    defaultTitle: 'Shop Location & Address'
   },
   documents: {
     schemaKey: 'documentsFormSchema',
     answersKey: 'documentsFormAnswers',
     icon: FiImage,
-    defaultTitle: 'Photos & Documents',
+    defaultTitle: 'Shop Photos & Banners',
     hasPhotos: true
   },
   bookingRules: {
     schemaKey: 'bookingRulesFormSchema',
     answersKey: 'bookingRulesFormAnswers',
     icon: FiSettings,
-    defaultTitle: 'Booking Rules'
+    defaultTitle: 'Store Policies'
   }
 };
 
 export const ADMIN_SCHEMA_OPTIONS = [
-  { key: 'vendorFormSchema', label: 'Service Details', section: 'profile' },
-  { key: 'catalogItemSchema', label: 'Packages & Options', section: 'menu' },
+  { key: 'vendorFormSchema', label: 'Shop Details & Location', section: 'profile' },
+  { key: 'catalogItemSchema', label: 'Designs & Products Showcase', section: 'menu' },
   { key: 'pricingFormSchema', label: 'Pricing', section: 'pricing' },
-  { key: 'availabilityFormSchema', label: 'Availability', section: 'availability' },
-  { key: 'serviceAreaFormSchema', label: 'Service Area', section: 'serviceArea' },
-  { key: 'documentsFormSchema', label: 'Documents', section: 'documents' },
-  { key: 'bookingRulesFormSchema', label: 'Booking Rules', section: 'bookingRules' }
+  { key: 'availabilityFormSchema', label: 'Store Timings', section: 'availability' },
+  { key: 'serviceAreaFormSchema', label: 'Shop Location & Address', section: 'serviceArea' },
+  { key: 'documentsFormSchema', label: 'Shop Photos & Banners', section: 'documents' },
+  { key: 'bookingRulesFormSchema', label: 'Store Policies', section: 'bookingRules' }
 ];
 
 const FORM_TYPE_ICONS = {
@@ -191,64 +191,37 @@ export const buildListingSteps = (category, commonForms = []) => {
     return steps;
   }
 
-  const forms = getActiveListingForms(category, commonForms);
-  forms.forEach((formDef) => {
-    if (formDef.type === 'menu') {
-      steps.push({
-        key: `form_${formDef.id}`,
-        formId: formDef.id,
-        formKey: formDef.key,
-        label: formDef.title || 'Packages & Blocks',
-        icon: FORM_TYPE_ICONS.menu,
-        type: 'menu',
-        schema: formDef.fields || []
-      });
-      return;
-    }
-    if (formDef.type === 'photos') {
-      steps.push({
-        key: `form_${formDef.id}`,
-        formId: formDef.id,
-        formKey: formDef.key,
-        label: formDef.title || 'Photos',
-        icon: FORM_TYPE_ICONS.photos,
-        type: 'photos',
-        schema: formDef.fields || [],
-        hasPhotos: true
-      });
-      return;
-    }
-    // fields type — only show if has fields
-    if (!(formDef.fields || []).length) return;
-    steps.push({
-      key: `form_${formDef.id}`,
-      formId: formDef.id,
-      formKey: formDef.key,
-      label: formDef.title || 'Form',
-      icon: FORM_TYPE_ICONS.fields,
-      type: 'fields',
-      schema: formDef.fields || [],
-      answersKey: formDef.answersKey || null // legacy only
-    });
+  steps.push({
+    key: 'details',
+    label: 'Shop Details & Location',
+    icon: FiFileText,
+    type: 'details',
+    schema: category?.vendorFormSchema || []
   });
 
-  // Safety: if somehow no menu step, still add packages before preview
-  if (!steps.some((s) => s.type === 'menu')) {
-    const previewIdx = steps.findIndex((s) => s.key === 'preview');
-    const packageStep = {
-      key: 'form_auto_packages',
-      formId: 'auto_packages',
-      formKey: 'menu',
-      label: 'Packages & Blocks',
-      icon: FORM_TYPE_ICONS.menu,
-      type: 'menu',
-      schema: category?.catalogItemSchema || []
-    };
-    if (previewIdx >= 0) steps.splice(previewIdx, 0, packageStep);
-    else steps.push(packageStep);
-  }
+  steps.push({
+    key: 'photos',
+    label: 'Photos & Banner Ads',
+    icon: FiImage,
+    type: 'photos'
+  });
 
-  steps.push({ key: 'preview', label: 'Preview', icon: FiEye });
+  steps.push({
+    key: 'offers',
+    label: 'Special Offers',
+    icon: FiTag,
+    type: 'offers'
+  });
+
+  steps.push({
+    key: 'products',
+    label: 'Designs & Clothes',
+    icon: FiLayers,
+    type: 'products',
+    schema: category?.catalogItemSchema || []
+  });
+
+  steps.push({ key: 'preview', label: 'Preview & Publish', icon: FiEye });
   return steps;
 };
 
@@ -270,6 +243,7 @@ export const extractListingTitle = (profileAnswers = {}, catalogItems = [], list
   const fromProfile =
     profileAnswers.title ||
     profileAnswers.shopName ||
+    profileAnswers.boutiqueName ||
     profileAnswers.businessName ||
     profileAnswers.shopTitle ||
     profileAnswers.name;
