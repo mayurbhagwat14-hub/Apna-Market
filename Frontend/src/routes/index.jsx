@@ -1,35 +1,37 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import LogoLoader from '../components/common/LogoLoader';
 
-// Import module routes
-import UserRoutes from '../modules/user/routes';
-import VendorRoutes from '../modules/vendor/routes';
-import AdminRoutes from '../modules/admin/routes';
-
-import LandingPage from '../modules/landing/pages/LandingPage';
-import DesignSystemPreview from '../modules/landing/pages/DesignSystemPreview';
+// Lazy load module routes for code splitting
+const LandingPage = lazy(() => import('../modules/landing/pages/LandingPage'));
+const UserRoutes = lazy(() => import('../modules/user/routes'));
+const VendorRoutes = lazy(() => import('../modules/vendor/routes'));
+const AdminRoutes = lazy(() => import('../modules/admin/routes'));
+const DesignSystemPreview = lazy(() => import('../modules/landing/pages/DesignSystemPreview'));
 
 const AppRoutes = () => {
   return (
-    <Routes>
-      {/* Proper Home Page */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/home" element={<LandingPage />} />
-      <Route path="/Home" element={<LandingPage />} />
+    <Suspense fallback={<LogoLoader />}>
+      <Routes>
+        {/* Home / Landing */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/home" element={<LandingPage />} />
+        <Route path="/Home" element={<LandingPage />} />
 
-      {/* User Routes */}
-      <Route path="/user/*" element={<UserRoutes />} />
+        {/* User Module */}
+        <Route path="/user/*" element={<UserRoutes />} />
 
-      {/* Vendor Routes */}
-      <Route path="/vendor/*" element={<VendorRoutes />} />
+        {/* Vendor Module */}
+        <Route path="/vendor/*" element={<VendorRoutes />} />
 
+        {/* Admin Module */}
+        <Route path="/admin/*" element={<AdminRoutes />} />
 
-
-      {/* Admin Routes */}
-      <Route path="/admin/*" element={<AdminRoutes />} />
-    </Routes>
+        {/* Dev / Design System Preview */}
+        <Route path="/design-system" element={<DesignSystemPreview />} />
+      </Routes>
+    </Suspense>
   );
 };
 
 export default AppRoutes;
-
