@@ -16,7 +16,7 @@ export default defineConfig({
     minify: 'esbuild',
     cssMinify: 'esbuild',
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {},
   },
 });
