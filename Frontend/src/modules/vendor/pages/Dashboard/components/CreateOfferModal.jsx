@@ -68,7 +68,7 @@ const CreateOfferModal = ({ isOpen, onClose, onOfferCreated }) => {
         validTill: formData.validTill,
         terms: formData.terms
       });
-      toast.success('Offer created and published live!');
+      toast.success('Offer submitted for admin approval!');
       onClose();
     } catch (err) {
       toast.error(err.message || 'Failed to publish offer');

@@ -163,7 +163,7 @@ const AdminDashboard = () => {
       link: '/admin/reports/bookings'
     },
     {
-      title: 'New Users',
+      title: 'Customers',
       value: (stats.totalUsers || 0).toLocaleString(),
       change: 0,
       icon: FiUser,
@@ -171,7 +171,7 @@ const AdminDashboard = () => {
       link: '/admin/users/analytics'
     },
     {
-      title: 'New Vendors',
+      title: 'Shops & Vendors',
       value: (stats.totalVendors || 0).toLocaleString(),
       change: 0,
       icon: FiBriefcase,

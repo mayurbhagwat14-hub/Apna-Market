@@ -257,7 +257,15 @@ const vendorSchema = new mongoose.Schema({
     url: { type: String, required: true },
     caption: { type: String, default: '' },
     category: { type: String, default: 'Storefront' }, // Storefront, Interior, Counter, Products, Menu
-    uploadedAt: { type: Date, default: Date.now }
+    uploadedAt: { type: Date, default: Date.now },
+    reviewStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    rejectedReason: { type: String, default: null }
   }],
   offers: [{
     title: { type: String, required: true },
@@ -273,7 +281,15 @@ const vendorSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     viewsCount: { type: Number, default: 0 },
     claimsCount: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    reviewStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    rejectedReason: { type: String, default: null }
   }],
   marketingStats: {
     storeViews: { type: Number, default: 1240 },

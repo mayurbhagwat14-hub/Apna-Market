@@ -14,7 +14,10 @@ const {
   getAllVendorBookings,
   getVendorPaymentsSummary,
   toggleVendorStatus,
-  deleteVendor
+  deleteVendor,
+  getVendorMarketingApprovals,
+  approveVendorMarketingItem,
+  rejectVendorMarketingItem
 } = require('../../controllers/adminControllers/adminVendorController');
 
 // Validation rules
@@ -24,11 +27,14 @@ const rejectVendorValidation = [
 
 // Routes
 router.get('/vendors', authenticate, isAdmin, getAllVendors);
+router.get('/vendors/marketing-approvals', authenticate, isAdmin, getVendorMarketingApprovals);
 router.get('/vendors/bookings', authenticate, isAdmin, getAllVendorBookings);
 router.get('/vendors/payments', authenticate, isAdmin, getVendorPaymentsSummary);
 router.get('/vendors/:id', authenticate, isAdmin, getVendorDetails);
 router.post('/vendors/:id/approve', authenticate, isAdmin, approveVendor);
 router.post('/vendors/:id/reject', authenticate, isAdmin, rejectVendorValidation, rejectVendor);
+router.post('/vendors/:id/marketing/:itemType/:itemId/approve', authenticate, isAdmin, approveVendorMarketingItem);
+router.post('/vendors/:id/marketing/:itemType/:itemId/reject', authenticate, isAdmin, rejectVendorMarketingItem);
 router.post('/vendors/:id/suspend', authenticate, isAdmin, suspendVendor);
 router.patch('/vendors/:id/status', authenticate, isAdmin, toggleVendorStatus); // New
 router.delete('/vendors/:id', authenticate, isAdmin, deleteVendor); // New

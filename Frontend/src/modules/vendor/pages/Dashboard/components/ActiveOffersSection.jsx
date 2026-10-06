@@ -39,6 +39,7 @@ const ActiveOffersSection = memo(({ offers = [], onOpenCreateModal, onToggleOffe
         <div className="space-y-3.5">
           {offers.map((offer) => {
             const isOfferActive = offer.isActive !== false;
+            const isApproved = !offer.reviewStatus || offer.reviewStatus === 'approved';
             const validDate = offer.validTill ? new Date(offer.validTill).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Ongoing';
 
             return (
@@ -77,8 +78,9 @@ const ActiveOffersSection = memo(({ offers = [], onOpenCreateModal, onToggleOffe
                         <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-1">
                           <input
                             type="checkbox"
-                            checked={isOfferActive}
+                            checked={isOfferActive && isApproved}
                             onChange={() => onToggleOffer(offer._id || offer.id, !isOfferActive)}
+                            disabled={!isApproved}
                             className="sr-only peer"
                           />
                           <div className="w-8 h-4.5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#016A54]"></div>
@@ -114,7 +116,7 @@ const ActiveOffersSection = memo(({ offers = [], onOpenCreateModal, onToggleOffe
                         <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400">
                           <span className="flex items-center gap-1 text-emerald-700">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            {isOfferActive ? 'Active on App' : 'Paused'}
+                            {!isApproved ? 'Pending admin approval' : (isOfferActive ? 'Active on App' : 'Paused')}
                           </span>
                           <span className="flex items-center gap-1">
                             <FiEye className="w-3 h-3" /> {offer.viewsCount || 0} views

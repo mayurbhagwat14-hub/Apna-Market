@@ -4,6 +4,7 @@ const VendorBill = require('../../models/VendorBill');
 const { validationResult } = require('express-validator');
 const { VENDOR_STATUS, BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
 const { createNotification } = require('../notificationControllers/notificationController');
+const { syncApprovedMarketingToListing } = require('../vendorControllers/vendorMarketingController');
 
 /**
  * Get all vendors with filters and pagination
@@ -552,6 +553,150 @@ const deleteVendor = async (req, res) => {
   }
 };
 
+const marketingItemConfig = {
+  offer: {
+    path: 'offers',
+    title: 'Offer',
+    approvedMessage: 'Your offer has been approved and is now live.',
+    rejectedMessage: 'Your offer was rejected'
+  },
+  photo: {
+    path: 'shopPhotos',
+    title: 'Shop photo',
+    approvedMessage: 'Your shop photo has been approved and is now live.',
+    rejectedMessage: 'Your shop photo was rejected'
+  }
+};
+
+const getVendorMarketingApprovals = async (req, res) => {
+  try {
+    const { status = 'pending', type = 'all', page = 1, limit = 50 } = req.query;
+    const allowedStatuses = ['pending', 'approved', 'rejected'];
+    const reviewStatus = allowedStatuses.includes(status) ? status : 'pending';
+
+    const query = {};
+    if (type === 'offer') query['offers.reviewStatus'] = reviewStatus;
+    else if (type === 'photo') query['shopPhotos.reviewStatus'] = reviewStatus;
+    else {
+      query.$or = [
+        { 'offers.reviewStatus': reviewStatus },
+        { 'shopPhotos.reviewStatus': reviewStatus }
+      ];
+    }
+
+    const vendors = await Vendor.find(query)
+      .select('name businessName email phone shopPhotos offers')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const items = [];
+    vendors.forEach((vendor) => {
+      if (type === 'all' || type === 'offer') {
+        (vendor.offers || [])
+          .filter((offer) => offer.reviewStatus === reviewStatus)
+          .forEach((offer) => items.push({ type: 'offer', vendor, item: offer, submittedAt: offer.createdAt }));
+      }
+      if (type === 'all' || type === 'photo') {
+        (vendor.shopPhotos || [])
+          .filter((photo) => photo.reviewStatus === reviewStatus)
+          .forEach((photo) => items.push({ type: 'photo', vendor, item: photo, submittedAt: photo.uploadedAt }));
+      }
+    });
+
+    items.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const start = (pageNum - 1) * limitNum;
+
+    res.status(200).json({
+      success: true,
+      data: items.slice(start, start + limitNum),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: items.length,
+        pages: Math.ceil(items.length / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Get vendor marketing approvals error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch marketing approvals' });
+  }
+};
+
+const approveVendorMarketingItem = async (req, res) => {
+  try {
+    const { id, itemType, itemId } = req.params;
+    const config = marketingItemConfig[itemType];
+    if (!config) return res.status(400).json({ success: false, message: 'Invalid marketing item type' });
+
+    const vendor = await Vendor.findById(id);
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const item = vendor[config.path].id(itemId);
+    if (!item) return res.status(404).json({ success: false, message: `${config.title} not found` });
+
+    item.reviewStatus = 'approved';
+    item.reviewedAt = new Date();
+    item.reviewedBy = req.user.id;
+    item.rejectedReason = null;
+    await vendor.save();
+    await syncApprovedMarketingToListing(vendor._id, vendor);
+
+    await createNotification({
+      vendorId: vendor._id,
+      type: 'general',
+      title: `${config.title} approved`,
+      message: config.approvedMessage,
+      relatedId: vendor._id,
+      relatedType: 'vendor',
+      data: { itemType, itemId, reviewStatus: 'approved' }
+    });
+
+    res.status(200).json({ success: true, message: `${config.title} approved successfully`, item });
+  } catch (error) {
+    console.error('Approve vendor marketing item error:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve marketing item' });
+  }
+};
+
+const rejectVendorMarketingItem = async (req, res) => {
+  try {
+    const { id, itemType, itemId } = req.params;
+    const { reason = '' } = req.body;
+    const config = marketingItemConfig[itemType];
+    if (!config) return res.status(400).json({ success: false, message: 'Invalid marketing item type' });
+
+    const vendor = await Vendor.findById(id);
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const item = vendor[config.path].id(itemId);
+    if (!item) return res.status(404).json({ success: false, message: `${config.title} not found` });
+
+    item.reviewStatus = 'rejected';
+    item.reviewedAt = new Date();
+    item.reviewedBy = req.user.id;
+    item.rejectedReason = reason.trim() || 'Rejected by admin';
+    await vendor.save();
+    await syncApprovedMarketingToListing(vendor._id, vendor);
+
+    await createNotification({
+      vendorId: vendor._id,
+      type: 'general',
+      title: `${config.title} rejected`,
+      message: `${config.rejectedMessage}. Reason: ${item.rejectedReason}`,
+      relatedId: vendor._id,
+      relatedType: 'vendor',
+      data: { itemType, itemId, reviewStatus: 'rejected', reason: item.rejectedReason }
+    });
+
+    res.status(200).json({ success: true, message: `${config.title} rejected`, item });
+  } catch (error) {
+    console.error('Reject vendor marketing item error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject marketing item' });
+  }
+};
+
 module.exports = {
   getAllVendors,
   getVendorDetails,
@@ -563,6 +708,9 @@ module.exports = {
   getAllVendorBookings,
   getVendorPaymentsSummary,
   toggleVendorStatus,
-  deleteVendor
+  deleteVendor,
+  getVendorMarketingApprovals,
+  approveVendorMarketingItem,
+  rejectVendorMarketingItem
 };
 

@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { FiCheck, FiX, FiEye, FiSearch, FiFilter, FiDownload, FiLoader, FiPower, FiTrash2 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import CardShell from '../UserCategories/components/CardShell';
@@ -38,7 +37,6 @@ const AllVendors = () => {
 
   const filteredVendors = useMemo(() => {
     return vendors.filter(vendor => {
-      const vId = vendor._id || vendor.id;
       const serviceString = Array.isArray(vendor.service)
         ? vendor.service.join(' ')
         : (vendor.service || '');
@@ -86,6 +84,40 @@ const AllVendors = () => {
     } catch (error) {
       console.error('Error rejecting vendor:', error);
       toast.error('Failed to reject vendor. Please try again.');
+    }
+  };
+
+  const handleMarketingReview = async (vendorId, itemType, itemId, action) => {
+    try {
+      const response = action === 'approve'
+        ? await adminVendorService.approveMarketingItem(vendorId, itemType, itemId)
+        : await adminVendorService.rejectMarketingItem(vendorId, itemType, itemId);
+
+      if (response.success) {
+        const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+        const collectionKey = itemType === 'offer' ? 'offers' : 'shopPhotos';
+
+        const updateVendor = (vendor) => {
+          if (!vendor || (vendor._id !== vendorId && vendor.id !== vendorId)) return vendor;
+          return {
+            ...vendor,
+            [collectionKey]: (vendor[collectionKey] || []).map((item) =>
+              (item._id === itemId || item.id === itemId)
+                ? { ...item, reviewStatus: nextStatus, rejectedReason: response.item?.rejectedReason || item.rejectedReason }
+                : item
+            )
+          };
+        };
+
+        setVendors(prev => prev.map(updateVendor));
+        setSelectedVendor(prev => updateVendor(prev));
+        toast.success(response.message || `${itemType} ${nextStatus}`);
+      } else {
+        toast.error(response.message || `Failed to ${action} ${itemType}`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing marketing item:`, error);
+      toast.error(`Failed to ${action} ${itemType}`);
     }
   };
 
@@ -149,13 +181,15 @@ const AllVendors = () => {
   const pendingCount = vendors.filter(v => v.approvalStatus === 'pending').length;
   const approvedCount = vendors.filter(v => v.approvalStatus === 'approved').length;
   const rejectedCount = vendors.filter(v => v.approvalStatus === 'rejected').length;
+  const pendingMarketingCount = (vendor) =>
+    [...(vendor.shopPhotos || []), ...(vendor.offers || [])].filter(item => item.reviewStatus === 'pending').length;
 
   return (
     <div className="space-y-4">
       <CardShell
         icon={FiFilter}
-        title="Vendor Management"
-        subtitle="Manage and verify platform vendors"
+        title="Shop & Vendor Review"
+        subtitle="Verify Apna Market shops, vendor KYC, offers, and shop photos"
       >
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -249,6 +283,11 @@ const AllVendors = () => {
                             }`}>
                             {vendor.approvalStatus}
                           </span>
+                          {pendingMarketingCount(vendor) > 0 && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border bg-amber-50 text-amber-700 border-amber-100">
+                              {pendingMarketingCount(vendor)} content pending
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
@@ -418,6 +457,54 @@ const AllVendors = () => {
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Bank Account & Payout Details */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-3">Shop Photos & Offers Review</h3>
+              {pendingMarketingCount(selectedVendor) === 0 ? (
+                <p className="text-xs text-slate-400 italic bg-slate-50 p-3 rounded-lg border border-dashed">No pending shop photos or offers.</p>
+              ) : (
+                <div className="space-y-4">
+                  {(selectedVendor.shopPhotos || []).filter(photo => photo.reviewStatus === 'pending').map((photo) => (
+                    <div key={photo._id || photo.id} className="flex gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50/40">
+                      <img src={photo.url} alt={photo.caption || 'Shop photo'} className="w-24 h-20 object-cover rounded-lg border border-white bg-white" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-700">Pending Photo</div>
+                        <p className="text-xs font-bold text-slate-900 truncate">{photo.caption || 'Shop Showcase'}</p>
+                        <p className="text-[11px] text-slate-500">{photo.category || 'Storefront'}</p>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => handleMarketingReview(selectedVendor._id || selectedVendor.id, 'photo', photo._id || photo.id, 'approve')} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1">
+                            <FiCheck className="w-3 h-3" /> Approve
+                          </button>
+                          <button onClick={() => handleMarketingReview(selectedVendor._id || selectedVendor.id, 'photo', photo._id || photo.id, 'reject')} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1">
+                            <FiX className="w-3 h-3" /> Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(selectedVendor.offers || []).filter(offer => offer.reviewStatus === 'pending').map((offer) => (
+                    <div key={offer._id || offer.id} className="flex gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50/40">
+                      <img src={offer.imageUrl || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=300&auto=format&fit=crop&q=80'} alt={offer.title} className="w-24 h-20 object-cover rounded-lg border border-white bg-white" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-700">Pending Offer</div>
+                        <p className="text-xs font-bold text-slate-900 truncate">{offer.title}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{offer.discountBadge || 'OFFER'} {offer.code ? `• ${offer.code}` : ''}</p>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => handleMarketingReview(selectedVendor._id || selectedVendor.id, 'offer', offer._id || offer.id, 'approve')} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1">
+                            <FiCheck className="w-3 h-3" /> Approve
+                          </button>
+                          <button onClick={() => handleMarketingReview(selectedVendor._id || selectedVendor.id, 'offer', offer._id || offer.id, 'reject')} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1">
+                            <FiX className="w-3 h-3" /> Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

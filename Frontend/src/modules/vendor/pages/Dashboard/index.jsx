@@ -103,7 +103,7 @@ const Dashboard = memo(() => {
           stats: {
             ...prev.stats,
             ...res.data.stats,
-            activeOffersCount: (res.data.offers || []).filter(o => o.isActive).length,
+            activeOffersCount: (res.data.offers || []).filter(o => (!o.reviewStatus || o.reviewStatus === 'approved') && o.isActive).length,
             totalPhotosCount: (res.data.shopPhotos || []).length
           }
         }));
@@ -299,13 +299,16 @@ const Dashboard = memo(() => {
       await vendorMarketingService.updateOffer(id, { isActive });
       setMarketingData(prev => ({
         ...prev,
-        offers: prev.offers.map(o => (o._id === id || o.id === id ? { ...o, isActive } : o)),
+        offers: prev.offers.map(o => (o._id === id || o.id === id ? { ...o, isActive, reviewStatus: 'pending' } : o)),
         stats: {
           ...prev.stats,
-          activeOffersCount: prev.offers.filter(o => (o._id === id || o.id === id ? isActive : o.isActive)).length
+          activeOffersCount: prev.offers.filter(o => {
+            if (o._id === id || o.id === id) return false;
+            return (!o.reviewStatus || o.reviewStatus === 'approved') && o.isActive;
+          }).length
         }
       }));
-      toast.success(isActive ? 'Offer activated live on app!' : 'Offer paused');
+      toast.success(isActive ? 'Offer activation sent for admin approval' : 'Offer pause sent for admin approval');
     } catch (err) {
       toast.error('Failed to update offer');
     }

@@ -9,46 +9,32 @@
     "children": []
   },
   {
-    "title": "Users",
+    "title": "Customers",
     "route": "/admin/users",
     "allowedRoles": [
       "super_admin",
       "admin"
     ],
     "children": [
-      "All Users",
-      "User Bookings",
-      "User Analytics"
+      "All Customers",
+      "Customer Orders",
+      "Customer Analytics"
     ]
   },
   {
-    "title": "Vendors",
+    "title": "Shops & Vendors",
     "route": "/admin/vendors",
     "allowedRoles": [
       "super_admin",
       "admin"
     ],
     "children": [
-      "All Vendors",
-      "Vendor Bookings",
-      "Service Listings",
-      "Vendor Analytics"
+      "All Shops",
+      "Listing Review",
+      "Shop Analytics",
+      "Marketing Approvals"
     ]
   },
-  {
-    "title": "Bookings",
-    "route": "/admin/bookings",
-    "allowedRoles": [
-      "super_admin",
-      "admin"
-    ],
-    "children": [
-      "All Bookings",
-      "Booking Tracking",
-      "Booking Notifications"
-    ]
-  },
-
   {
     "title": "Payments",
     "route": "/admin/payments",
@@ -57,8 +43,8 @@
     ],
     "children": [
       "Payment Overview",
-      "User Payments",
-      "Vendor Payments",
+      "Customer Payments",
+      "Vendor Payouts",
       "Admin Revenue",
       "Payment Reports"
     ]
@@ -72,12 +58,12 @@
     "children": [
       "Pending",
       "Withdrawals",
-      "Vendors with Due",
+      "Vendor Dues",
       "History"
     ]
   },
   {
-    "title": "User Catalog",
+    "title": "Apna Market Catalog",
     "route": "/admin/user-categories",
     "allowedRoles": [
       "super_admin",
@@ -85,11 +71,11 @@
     ],
     "children": [
       "Home",
-      "Manage Categories"
+      "Marketplace Categories"
     ]
   },
   {
-    "title": "Vendor Services",
+    "title": "Shop Services",
     "route": "/admin/user-categories/vendor-services",
     "allowedRoles": [
       "super_admin",
@@ -98,7 +84,7 @@
     "children": []
   },
   {
-    "title": "Vendor Parts",
+    "title": "Shop Items & Parts",
     "route": "/admin/user-categories/vendor-parts",
     "allowedRoles": [
       "super_admin",
@@ -127,7 +113,7 @@
     "children": []
   },
   {
-    "title": "Vendor Subscriptions",
+    "title": "Shop Promotion Plans",
     "route": "/admin/vendor-ad-plans",
     "allowedRoles": [
       "super_admin",

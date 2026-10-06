@@ -2,6 +2,42 @@ const Vendor = require('../../models/Vendor');
 const ServiceListing = require('../../models/ServiceListing');
 const cloudinaryService = require('../../services/cloudinaryService');
 
+const isApprovedMarketingItem = (item) => !item.reviewStatus || item.reviewStatus === 'approved';
+
+const syncApprovedMarketingToListing = async (vendorId, vendor = null) => {
+  const sourceVendor = vendor || await Vendor.findById(vendorId);
+  if (!sourceVendor) return;
+
+  const primaryListing = await ServiceListing.findOne({ vendorId });
+  if (!primaryListing) return;
+
+  const approvedPhotos = (sourceVendor.shopPhotos || [])
+    .filter(isApprovedMarketingItem)
+    .map((photo) => photo.url)
+    .filter(Boolean);
+
+  primaryListing.portfolioPhotos = Array.from(new Set([
+    ...(primaryListing.portfolioPhotos || []).filter((url) => !url.includes('/vendors/shop-photos/')),
+    ...approvedPhotos
+  ]));
+
+  primaryListing.dynamicFormAnswers = primaryListing.dynamicFormAnswers || {};
+  const activeOffer = (sourceVendor.offers || []).find((offer) => isApprovedMarketingItem(offer) && offer.isActive);
+  if (activeOffer) {
+    primaryListing.dynamicFormAnswers.offer = {
+      title: activeOffer.title,
+      badge: activeOffer.discountBadge,
+      code: activeOffer.code,
+      image: activeOffer.imageUrl,
+      discountPercent: activeOffer.discountPercent
+    };
+  } else {
+    delete primaryListing.dynamicFormAnswers.offer;
+  }
+
+  await primaryListing.save();
+};
+
 /**
  * GET /api/vendors/marketing
  * Fetches vendor marketing dashboard data: photos, offers, stats, visibility
@@ -33,13 +69,18 @@ const getMarketingOverview = async (req, res) => {
     }
 
     // Default marketing stats if empty
+    const approvedOffers = (vendor.offers || []).filter(isApprovedMarketingItem);
+    const approvedPhotos = syncedPhotos.filter(isApprovedMarketingItem);
+
     const stats = {
       storeViews: vendor.marketingStats?.storeViews || 1480,
       offerClicks: vendor.marketingStats?.offerClicks || 215,
       inquiriesCalls: vendor.marketingStats?.inquiriesCalls || 38,
       customerLikes: vendor.marketingStats?.customerLikes || 94,
-      activeOffersCount: (vendor.offers || []).filter(o => o.isActive).length,
-      totalPhotosCount: syncedPhotos.length
+      activeOffersCount: approvedOffers.filter(o => o.isActive).length,
+      pendingOffersCount: (vendor.offers || []).filter(o => o.reviewStatus === 'pending').length,
+      pendingPhotosCount: syncedPhotos.filter(p => p.reviewStatus === 'pending').length,
+      totalPhotosCount: approvedPhotos.length
     };
 
     res.status(200).json({
@@ -115,29 +156,19 @@ const createOffer = async (req, res) => {
       isActive: true,
       viewsCount: 0,
       claimsCount: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
+      reviewStatus: 'pending',
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectedReason: null
     };
 
     vendor.offers.unshift(newOffer);
     await vendor.save();
 
-    // Sync to active ServiceListing so user side ListingDetail & BusinessCard render this offer
-    const primaryListing = await ServiceListing.findOne({ vendorId });
-    if (primaryListing) {
-      primaryListing.dynamicFormAnswers = primaryListing.dynamicFormAnswers || {};
-      primaryListing.dynamicFormAnswers.offer = {
-        title: newOffer.title,
-        badge: newOffer.discountBadge,
-        code: newOffer.code,
-        image: newOffer.imageUrl,
-        discountPercent: newOffer.discountPercent
-      };
-      await primaryListing.save();
-    }
-
     res.status(201).json({
       success: true,
-      message: 'Offer created successfully and live on Apna Market!',
+      message: 'Offer submitted successfully. It will go live after admin approval.',
       offer: vendor.offers[0]
     });
   } catch (error) {
@@ -181,30 +212,17 @@ const updateOffer = async (req, res) => {
       }
     }
 
-    await vendor.save();
+    offer.reviewStatus = 'pending';
+    offer.reviewedAt = null;
+    offer.reviewedBy = null;
+    offer.rejectedReason = null;
 
-    // Sync active offer to listing
-    const primaryListing = await ServiceListing.findOne({ vendorId });
-    if (primaryListing) {
-      primaryListing.dynamicFormAnswers = primaryListing.dynamicFormAnswers || {};
-      const activeOffer = vendor.offers.find(o => o.isActive);
-      if (activeOffer) {
-        primaryListing.dynamicFormAnswers.offer = {
-          title: activeOffer.title,
-          badge: activeOffer.discountBadge,
-          code: activeOffer.code,
-          image: activeOffer.imageUrl,
-          discountPercent: activeOffer.discountPercent
-        };
-      } else {
-        delete primaryListing.dynamicFormAnswers.offer;
-      }
-      await primaryListing.save();
-    }
+    await vendor.save();
+    await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(200).json({
       success: true,
-      message: 'Offer updated successfully',
+      message: 'Offer update submitted for admin approval',
       offer
     });
   } catch (error) {
@@ -227,23 +245,7 @@ const deleteOffer = async (req, res) => {
 
     vendor.offers = vendor.offers.filter(o => o._id.toString() !== id);
     await vendor.save();
-
-    // Sync to listing
-    const primaryListing = await ServiceListing.findOne({ vendorId });
-    if (primaryListing && primaryListing.dynamicFormAnswers?.offer) {
-      const remainingActive = vendor.offers.find(o => o.isActive);
-      if (remainingActive) {
-        primaryListing.dynamicFormAnswers.offer = {
-          title: remainingActive.title,
-          badge: remainingActive.discountBadge,
-          code: remainingActive.code,
-          image: remainingActive.imageUrl
-        };
-      } else {
-        delete primaryListing.dynamicFormAnswers.offer;
-      }
-      await primaryListing.save();
-    }
+    await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(200).json({ success: true, message: 'Offer deleted successfully' });
   } catch (error) {
@@ -280,25 +282,19 @@ const uploadShopPhoto = async (req, res) => {
       url: finalUrl,
       caption: caption ? caption.trim() : 'Shop Showcase',
       category: category || 'Storefront',
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
+      reviewStatus: 'pending',
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectedReason: null
     };
 
     vendor.shopPhotos.unshift(newPhoto);
     await vendor.save();
 
-    // Sync to ServiceListing portfolioPhotos so customers view it on shop page
-    const primaryListing = await ServiceListing.findOne({ vendorId });
-    if (primaryListing) {
-      if (!primaryListing.portfolioPhotos) primaryListing.portfolioPhotos = [];
-      if (!primaryListing.portfolioPhotos.includes(finalUrl)) {
-        primaryListing.portfolioPhotos.unshift(finalUrl);
-        await primaryListing.save();
-      }
-    }
-
     res.status(201).json({
       success: true,
-      message: 'Shop photo uploaded successfully',
+      message: 'Shop photo submitted successfully. It will go live after admin approval.',
       photo: vendor.shopPhotos[0]
     });
   } catch (error) {
@@ -324,15 +320,7 @@ const deleteShopPhoto = async (req, res) => {
 
     vendor.shopPhotos = vendor.shopPhotos.filter(p => p._id.toString() !== id);
     await vendor.save();
-
-    // Also remove from ServiceListing portfolioPhotos
-    if (photoUrl) {
-      const primaryListing = await ServiceListing.findOne({ vendorId });
-      if (primaryListing && primaryListing.portfolioPhotos) {
-        primaryListing.portfolioPhotos = primaryListing.portfolioPhotos.filter(u => u !== photoUrl);
-        await primaryListing.save();
-      }
-    }
+    await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(200).json({ success: true, message: 'Photo deleted successfully' });
   } catch (error) {
@@ -374,5 +362,7 @@ module.exports = {
   deleteOffer,
   uploadShopPhoto,
   deleteShopPhoto,
-  toggleStoreVisibility
+  toggleStoreVisibility,
+  syncApprovedMarketingToListing,
+  isApprovedMarketingItem
 };

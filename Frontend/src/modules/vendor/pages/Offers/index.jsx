@@ -21,7 +21,7 @@ const OffersPage = () => {
       if (res.success && res.data) {
         const list = res.data.offers || [];
         setOffers(list);
-        const active = list.filter(o => o.isActive !== false);
+        const active = list.filter(o => (!o.reviewStatus || o.reviewStatus === 'approved') && o.isActive !== false);
         setStats({
           activeCount: active.length,
           totalViews: list.reduce((acc, o) => acc + (o.viewsCount || 0), 0) || 450,
@@ -50,9 +50,9 @@ const OffersPage = () => {
   const handleToggleOffer = async (id, isActive) => {
     try {
       await vendorMarketingService.updateOffer(id, { isActive });
-      setOffers(prev => prev.map(o => (o._id === id || o.id === id ? { ...o, isActive } : o)));
-      toast.success(isActive ? 'Offer activated live on app!' : 'Offer paused');
-    } catch (err) {
+      setOffers(prev => prev.map(o => (o._id === id || o.id === id ? { ...o, isActive, reviewStatus: 'pending' } : o)));
+      toast.success(isActive ? 'Offer activation sent for admin approval' : 'Offer pause sent for admin approval');
+    } catch {
       toast.error('Failed to update offer');
     }
   };
@@ -63,7 +63,7 @@ const OffersPage = () => {
       await vendorMarketingService.deleteOffer(id);
       setOffers(prev => prev.filter(o => o._id !== id && o.id !== id));
       toast.success('Offer deleted');
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete offer');
     }
   };
@@ -113,6 +113,7 @@ const OffersPage = () => {
           <div className="space-y-3.5">
             {offers.map((offer) => {
               const isOfferActive = offer.isActive !== false;
+              const isApproved = !offer.reviewStatus || offer.reviewStatus === 'approved';
               const validDate = offer.validTill ? new Date(offer.validTill).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Ongoing';
 
               return (
@@ -142,8 +143,9 @@ const OffersPage = () => {
                         <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-1">
                           <input
                             type="checkbox"
-                            checked={isOfferActive}
+                            checked={isOfferActive && isApproved}
                             onChange={() => handleToggleOffer(offer._id || offer.id, !isOfferActive)}
+                            disabled={!isApproved}
                             className="sr-only peer"
                           />
                           <div className="w-8 h-4.5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#016A54]"></div>
@@ -176,7 +178,7 @@ const OffersPage = () => {
                       <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-400">
                         <span className="text-emerald-700 flex items-center gap-1">
                           <FiCheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                          {isOfferActive ? 'Visible to nearby users' : 'Offer is paused'}
+                          {!isApproved ? 'Pending admin approval' : (isOfferActive ? 'Visible to nearby users' : 'Offer is paused')}
                         </span>
                         <button
                           type="button"

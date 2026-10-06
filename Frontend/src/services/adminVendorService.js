@@ -89,6 +89,21 @@ const adminVendorService = {
     return response.data;
   },
 
+  getMarketingApprovals: async (params = {}) => {
+    const response = await api.get('/admin/vendors/marketing-approvals', { params });
+    return response.data;
+  },
+
+  approveMarketingItem: async (vendorId, itemType, itemId) => {
+    const response = await api.post(`/admin/vendors/${vendorId}/marketing/${itemType}/${itemId}/approve`);
+    return response.data;
+  },
+
+  rejectMarketingItem: async (vendorId, itemType, itemId, reason = '') => {
+    const response = await api.post(`/admin/vendors/${vendorId}/marketing/${itemType}/${itemId}/reject`, { reason });
+    return response.data;
+  },
+
   /**
    * Get vendor report/analytics (reusing report endpoint if needed, or separate)
    */

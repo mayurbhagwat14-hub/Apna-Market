@@ -214,8 +214,8 @@ const VendorAdPlans = () => {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Vendor Advertisement Plans</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Create and manage subscription plans for vendor shop advertisements</p>
+          <h2 className="text-lg font-bold text-gray-800">Shop Promotion Plans</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Create and manage Apna Market promotion plans for local shops</p>
         </div>
         <button
           onClick={openCreateModal}
@@ -613,8 +613,8 @@ const VendorAdPlans = () => {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Page Title */}
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">Vendor Subscriptions</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage advertisement plans and vendor subscriptions</p>
+        <h1 className="text-2xl font-extrabold text-gray-900">Shop Promotion Subscriptions</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage promotion plans and vendor subscriptions for Apna Market shops</p>
       </div>
 
       {/* Tabs */}

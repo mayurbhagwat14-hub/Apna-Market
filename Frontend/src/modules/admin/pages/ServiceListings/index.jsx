@@ -134,7 +134,7 @@ const ServiceListingsReview = () => {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-neutral-900 tracking-tight">Listing Block Review</h1>
+          <h1 className="text-2xl font-black text-neutral-900 tracking-tight">Shop Listing Review</h1>
           <p className="text-xs text-neutral-500 mt-0.5">Approve, reject, or request changes — independent of vendor account approval</p>
         </div>
         <button onClick={loadData} className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 text-xs font-bold rounded-xl hover:bg-neutral-50 flex items-center gap-2 self-start sm:self-auto shadow-sm">
@@ -282,7 +282,7 @@ const ServiceListingsReview = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Customer preview</p>
-                  <h2 className="text-base font-black text-neutral-900">Listing block review</h2>
+                  <h2 className="text-base font-black text-neutral-900">Shop listing review</h2>
                 </div>
                 <button onClick={() => setSelectedListing(null)} className="p-1 rounded-lg hover:bg-white text-neutral-400">
                   <FiX className="w-5 h-5" />

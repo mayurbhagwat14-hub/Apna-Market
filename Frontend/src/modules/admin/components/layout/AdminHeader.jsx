@@ -34,37 +34,39 @@ const AdminHeader = ({ onMenuClick }) => {
   // Get page info from pathname
   const getPageInfo = (pathname) => {
     const mappings = [
-      { path: '/admin/dashboard', title: 'Dashboard', description: "Welcome back! Here's your business overview." },
-      { path: '/admin/users/all', title: 'All Users', description: 'Manage platform customers and their activity' },
-      { path: '/admin/users/bookings', title: 'User Bookings', description: 'Track customer booking history' },
-      { path: '/admin/users/analytics', title: 'User Analytics', description: 'Analyze customer behavior and growth' },
-      { path: '/admin/users/transactions', title: 'User Transactions', description: 'Monitor customer financial transactions' },
-      { path: '/admin/users', title: 'Users', description: 'Manage platform customers and their activity' },
-      { path: '/admin/vendors/all', title: 'All Vendors', description: 'Manage platform vendors and their activity' },
-      { path: '/admin/vendors/analytics', title: 'Vendor Analytics', description: 'Analyze vendor performance' },
-      { path: '/admin/vendors', title: 'Vendors', description: 'Manage vendor registrations and performance' },
-      { path: '/admin/workers/all', title: 'All Workers', description: 'Manage platform workers and their activity' },
-      { path: '/admin/workers/analytics', title: 'Worker Analytics', description: 'Analyze worker performance' },
-      { path: '/admin/workers', title: 'Workers', description: 'Monitor and manage platform workers' },
-      { path: '/admin/bookings', title: 'Bookings', description: 'Track and manage service bookings' },
-      { path: '/admin/bookings/notifications', title: 'Order Notifications', description: 'Track booking alerts and updates' },
-      { path: '/admin/user-categories', title: 'User Catalog', description: 'Manage platform services and categories' },
-      { path: '/admin/payments/users', title: 'User Transactions', description: 'Monitor customer financial transactions' },
-      { path: '/admin/payments/vendors', title: 'Vendor Transactions', description: 'Monitor vendor earnings and payouts' },
-      { path: '/admin/payments/workers', title: 'Worker Payments', description: 'Monitor and manage worker earnings and payouts' },
-      { path: '/admin/payments/revenue', title: 'Admin Revenue', description: 'Track platform commissions and income' },
-      { path: '/admin/payments/reports', title: 'Payment Report', description: 'Analyze payment data and financial insights' },
-      { path: '/admin/payments', title: 'Payments & Settlements', description: 'Monitor transactions and revenue' },
-      { path: '/admin/reports', title: 'Reports', description: 'Analyze platform performance with data insights' },
-      { path: '/admin/settings', title: 'Settings', description: 'Configure platform preferences' },
-      { path: '/admin/user-categories/categories', title: 'Categories', description: 'Manage service categories and listing config' },
+      { path: '/admin/dashboard', title: 'Apna Market Dashboard', description: 'Overview of local shops, customers, orders, and revenue.' },
+      { path: '/admin/users/all', title: 'Customers', description: 'Manage Apna Market customers and their activity.' },
+      { path: '/admin/users/bookings', title: 'Customer Orders', description: 'Track customer orders and booking history.' },
+      { path: '/admin/users/analytics', title: 'Customer Analytics', description: 'Analyze customer growth and behavior.' },
+      { path: '/admin/users/transactions', title: 'Customer Transactions', description: 'Monitor customer payments and wallet activity.' },
+      { path: '/admin/users', title: 'Customers', description: 'Manage Apna Market customers and their activity.' },
+      { path: '/admin/vendors/all', title: 'Shops & Vendors', description: 'Verify vendors, shops, offers, and store content.' },
+      { path: '/admin/vendors/analytics', title: 'Shop Analytics', description: 'Analyze vendor and local shop performance.' },
+      { path: '/admin/vendors', title: 'Shops & Vendors', description: 'Manage vendor registrations, shop content, and performance.' },
+      { path: '/admin/workers/all', title: 'Field Partners', description: 'Manage field partners and their activity.' },
+      { path: '/admin/workers/analytics', title: 'Partner Analytics', description: 'Analyze field partner performance.' },
+      { path: '/admin/workers', title: 'Field Partners', description: 'Monitor and manage Apna Market field partners.' },
+      { path: '/admin/bookings', title: 'Orders & Bookings', description: 'Track and manage Apna Market orders.' },
+      { path: '/admin/bookings/notifications', title: 'Order Alerts', description: 'Track booking alerts and customer updates.' },
+      { path: '/admin/user-categories', title: 'Apna Market Catalog', description: 'Manage customer home content, categories, brands, and listing setup.' },
+      { path: '/admin/payments/users', title: 'Customer Payments', description: 'Monitor customer payment transactions.' },
+      { path: '/admin/payments/vendors', title: 'Vendor Payouts', description: 'Monitor shop earnings, dues, and payouts.' },
+      { path: '/admin/payments/workers', title: 'Partner Payments', description: 'Monitor and manage field partner payouts.' },
+      { path: '/admin/payments/revenue', title: 'Apna Market Revenue', description: 'Track platform commissions and income.' },
+      { path: '/admin/payments/reports', title: 'Payment Reports', description: 'Analyze payment data and financial insights.' },
+      { path: '/admin/payments', title: 'Payments & Settlements', description: 'Monitor transactions, payouts, and revenue.' },
+      { path: '/admin/reports', title: 'Apna Market Reports', description: 'Analyze marketplace performance with data insights.' },
+      { path: '/admin/settings', title: 'Apna Market Settings', description: 'Configure app, admin, support, and marketplace preferences.' },
+      { path: '/admin/user-categories/categories', title: 'Marketplace Categories', description: 'Manage shop/service categories and listing config.' },
       { path: '/admin/settlements/pending', title: 'Pending Settlements', description: 'Review and approve vendor cash settlements' },
       { path: '/admin/settlements/withdrawals', title: 'Withdrawal Requests', description: 'Manage vendor payout requests' },
       { path: '/admin/settlements/vendors', title: 'Vendor Balances', description: 'Monitor vendor dues and credit limits' },
       { path: '/admin/settlements/history', title: 'Settlement History', description: 'View past transaction records' },
-      { path: '/admin/settlements', title: 'Settlements', description: 'Manage financial settlements' },
-      { path: '/admin/reviews', title: 'Reviews', description: 'Manage platform reviews and ratings' },
-      { path: '/admin/scrap', title: 'Scrap Orders', description: 'Manage platform scrap collection orders' },
+      { path: '/admin/settlements', title: 'Vendor Settlements', description: 'Manage shop dues, settlement requests, and withdrawals.' },
+      { path: '/admin/reviews', title: 'Customer Reviews', description: 'Manage Apna Market reviews and ratings.' },
+      { path: '/admin/vendor-ad-plans', title: 'Shop Promotion Plans', description: 'Manage advertisement plans and vendor subscriptions.' },
+      { path: '/admin/service-listings', title: 'Shop Listing Review', description: 'Approve vendor listings, packages, catalog items, photos, and offers.' },
+      { path: '/admin/scrap', title: 'Scrap Orders', description: 'Manage Apna Market scrap collection orders.' },
     ];
 
     const match = mappings.find(m => pathname === m.path || pathname.startsWith(m.path + '/'));
@@ -74,7 +76,7 @@ const AdminHeader = ({ onMenuClick }) => {
     const path = pathname.split('/').pop() || 'dashboard';
     return {
       title: path.charAt(0).toUpperCase() + path.slice(1),
-      description: `Manage your ${path} here.`
+      description: `Manage Apna Market ${path} here.`
     };
   };
 

@@ -58,6 +58,8 @@ const listingDisplayPrice = (pricing = {}) =>
   pricing.perGuardRate ||
   0;
 
+const isApprovedMarketingItem = (item) => !item.reviewStatus || item.reviewStatus === 'approved';
+
 const toPublicListingDto = (listing) => {
   const live = overlayApprovedVersion(listing);
   const vendor = live.vendorId;
@@ -70,6 +72,8 @@ const toPublicListingDto = (listing) => {
   const catalogItems = toPublicCatalogItems(live.catalogItems || [], category?.catalogItemSchema || []);
   const itemPrices = catalogItems.map((item) => item.price).filter((n) => n > 0);
   const displayPrice = itemPrices.length ? Math.min(...itemPrices) : listingDisplayPrice(live.pricing);
+  const approvedShopPhotos = (vendor?.shopPhotos || []).filter(isApprovedMarketingItem);
+  const approvedOffers = (vendor?.offers || []).filter(isApprovedMarketingItem);
 
   return {
     id: live._id.toString(),
@@ -99,11 +103,11 @@ const toPublicListingDto = (listing) => {
     ],
     portfolioPhotos: Array.from(new Set([
       ...(live.portfolioPhotos || []),
-      ...((vendor?.shopPhotos || []).map(p => p.url).filter(Boolean))
+      ...(approvedShopPhotos.map(p => p.url).filter(Boolean))
     ])),
     portfolioVideos: live.portfolioVideos || [],
-    offer: (vendor?.offers || []).find(o => o.isActive) || answers.offer || null,
-    offers: vendor?.offers || [],
+    offer: approvedOffers.find(o => o.isActive) || answers.offer || null,
+    offers: approvedOffers,
     documents: (live.documents || []).map((d) => ({
       label: d.label,
       url: d.url,

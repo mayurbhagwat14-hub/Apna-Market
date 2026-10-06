@@ -13,8 +13,8 @@ const AdminBottomNav = () => {
 
   const navItems = [
     { path: "/admin/dashboard", icon: FiHome, label: "Home" },
-    { path: "/admin/users", icon: FiUsers, label: "Users" },
-    { path: "/admin/bookings", icon: FiShoppingBag, label: "Bookings" },
+    { path: "/admin/users", icon: FiUsers, label: "Customers" },
+    { path: "/admin/bookings", icon: FiShoppingBag, label: "Orders" },
     { path: "/admin/settings", icon: FiSettings, label: "Settings" },
   ];
 

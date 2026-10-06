@@ -25,13 +25,15 @@ import { useBranding } from "../../../../context/BrandingContext";
 // Icon mapping for menu items
 const iconMap = {
   Dashboard: FiHome,
-  Users: FiUsers,
+  Customers: FiUsers,
   Vendors: FiBriefcase,
+  "Shops & Vendors": FiBriefcase,
   Workers: FiUser,
+  Orders: FiShoppingBag,
   Bookings: FiShoppingBag,
-  "User Catalog": FiGrid,
-  "Vendor Services": FiGrid,
-  "Vendor Parts": FiPackage,
+  "Apna Market Catalog": FiGrid,
+  "Shop Services": FiGrid,
+  "Shop Items & Parts": FiPackage,
   Payments: FiDollarSign,
   Reports: FiFileText,
   Notifications: FiBell,
@@ -40,7 +42,7 @@ const iconMap = {
   Settlements: FiDollarSign,
   Settings: FiSettings,
   Plans: FiPackage,
-  "Vendor Subscriptions": FiPackage,
+  "Shop Promotion Plans": FiPackage,
 };
 
 // Helper function to convert child name to route path
@@ -48,16 +50,22 @@ const getChildRoute = (parentRoute, childName) => {
   const routeMap = {
     "/admin/users": {
       "All Users": "/admin/users/all",
+      "All Customers": "/admin/users/all",
       "User Bookings": "/admin/users/bookings",
+      "Customer Orders": "/admin/users/bookings",
       "Transactions": "/admin/users/transactions",
       "User Analytics": "/admin/users/analytics",
+      "Customer Analytics": "/admin/users/analytics",
     },
     "/admin/vendors": {
       "All Vendors": "/admin/vendors/all",
-      "Vendor Bookings": "/admin/vendors/bookings",
+      "All Shops": "/admin/vendors/all",
       "Service Listings": "/admin/service-listings",
+      "Listing Review": "/admin/service-listings",
       "Vendor Analytics": "/admin/vendors/analytics",
+      "Shop Analytics": "/admin/vendors/analytics",
       "Vendor Payments": "/admin/vendors/payments",
+      "Marketing Approvals": "/admin/vendors/marketing-approvals",
     },
     "/admin/workers": {
       "All Workers": "/admin/workers/all",
@@ -65,20 +73,18 @@ const getChildRoute = (parentRoute, childName) => {
       "Worker Analytics": "/admin/workers/analytics",
       "Worker Payments": "/admin/workers/payments",
     },
-    "/admin/bookings": {
-      "All Bookings": "/admin/bookings",
-      "Booking Tracking": "/admin/bookings/tracking",
-      "Booking Notifications": "/admin/bookings/notifications",
-    },
     "/admin/user-categories": {
       "Home": "/admin/user-categories/home",
       "Manage Categories": "/admin/user-categories/categories",
+      "Marketplace Categories": "/admin/user-categories/categories",
     },
     "/admin/payments": {
       "Payment Overview": "/admin/payments/overview",
       "User Payments": "/admin/payments/users",
+      "Customer Payments": "/admin/payments/users",
       "Worker Payments": "/admin/payments/workers",
       "Vendor Payments": "/admin/payments/vendors",
+      "Vendor Payouts": "/admin/payments/vendors",
       "Admin Revenue": "/admin/payments/revenue",
       "Payment Reports": "/admin/payments/reports",
     },
@@ -102,6 +108,7 @@ const getChildRoute = (parentRoute, childName) => {
       "Pending": "/admin/settlements/pending",
       "Withdrawals": "/admin/settlements/withdrawals",
       "Vendors with Due": "/admin/settlements/vendors",
+      "Vendor Dues": "/admin/settlements/vendors",
       "History": "/admin/settlements/history",
     },
   };
@@ -184,14 +191,13 @@ const AdminSidebar = ({ isOpen, onClose }) => {
   }, []);
 
   // Auto-close sidebar on mobile when route changes
-  // Auto-close sidebar on mobile when route changes
   useEffect(() => {
     // Only close if screen is small (mobile)
     if (window.innerWidth < 1024) {
       onClose();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]); // Remove onClose to prevent re-triggering when parent re-renders
+  }, [location.pathname]);
 
   // Auto-expand menu items when their route is active
   useEffect(() => {
@@ -222,7 +228,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
       return location.pathname === "/admin/dashboard";
     }
 
-    // Special case for User Catalog to avoid overlap with Vendor Services/Parts
+    // Special case for catalog to avoid overlap with shop services/items.
     if (route === "/admin/user-categories") {
       if (location.pathname.startsWith("/admin/user-categories/vendor-")) {
         return false;
@@ -296,12 +302,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
           <span className="font-semibold flex-1 text-base">{item.title}</span>
 
           {/* Badge Display */}
-          {item.title === "Bookings" && counts.bookings > 0 && (
-            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse mr-2">
-              {counts.bookings > 99 ? '99+' : counts.bookings}
-            </span>
-          )}
-          {item.title === "Vendors" && counts.vendors > 0 && (
+          {(item.title === "Vendors" || item.title === "Shops & Vendors") && counts.vendors > 0 && (
             <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse mr-2">
               {counts.vendors > 99 ? '99+' : counts.vendors}
             </span>
@@ -404,7 +405,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
                 {branding?.appName || 'Apna Market'}
               </h2>
               <span className="text-[11px] font-black text-white/80 tracking-[0.25em] uppercase leading-normal mt-0.5 block">
-                ADMIN PANEL
+                MARKET ADMIN
               </span>
             </div>
           </div>
@@ -468,4 +469,3 @@ const AdminSidebar = ({ isOpen, onClose }) => {
 };
 
 export default AdminSidebar;
-

@@ -13,14 +13,14 @@ const Users = () => {
   const location = useLocation();
 
   const navTabs = [
-    { name: 'All Users', path: '/admin/users/all', icon: FiUsers },
-    { name: 'User Bookings', path: '/admin/users/bookings', icon: FiShoppingBag },
-    { name: 'User Analytics', path: '/admin/users/analytics', icon: FiActivity },
+    { name: 'All Customers', path: '/admin/users/all', icon: FiUsers },
+    { name: 'Customer Orders', path: '/admin/users/bookings', icon: FiShoppingBag },
+    { name: 'Customer Analytics', path: '/admin/users/analytics', icon: FiActivity },
   ];
 
   const getPageTitle = () => {
     const currentTab = navTabs.find(tab => location.pathname === tab.path);
-    return currentTab ? currentTab.name : 'User Management';
+    return currentTab ? currentTab.name : 'Customer Management';
   };
 
   return (

@@ -131,7 +131,7 @@ const VendorServicesPage = () => {
     <div className="space-y-6 max-w-7xl mx-auto p-2 sm:p-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Vendor Services & Form Builder</h1>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">Shop Services & Listing Forms</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Create categories, then build listing forms (heading + fields). Each form becomes one step for vendors.
           </p>
@@ -153,7 +153,7 @@ const VendorServicesPage = () => {
         </div>
       </div>
 
-      <CardShell icon={FiGrid} title={`Service Categories (${categories.length})`}>
+      <CardShell icon={FiGrid} title={`Marketplace Categories (${categories.length})`}>
         <div className="flex flex-col sm:flex-row gap-3 justify-between items-center mb-4">
           <div className="relative w-full sm:w-80">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
