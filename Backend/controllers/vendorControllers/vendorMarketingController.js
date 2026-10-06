@@ -2,7 +2,7 @@ const Vendor = require('../../models/Vendor');
 const ServiceListing = require('../../models/ServiceListing');
 const cloudinaryService = require('../../services/cloudinaryService');
 
-const isApprovedMarketingItem = (item) => !item.reviewStatus || item.reviewStatus === 'approved';
+const isApprovedMarketingItem = (item) => Boolean(item && item.reviewStatus === 'approved');
 
 const syncApprovedMarketingToListing = async (vendorId, vendor = null) => {
   const sourceVendor = vendor || await Vendor.findById(vendorId);
@@ -165,6 +165,7 @@ const createOffer = async (req, res) => {
 
     vendor.offers.unshift(newOffer);
     await vendor.save();
+    await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(201).json({
       success: true,
@@ -291,6 +292,7 @@ const uploadShopPhoto = async (req, res) => {
 
     vendor.shopPhotos.unshift(newPhoto);
     await vendor.save();
+    await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(201).json({
       success: true,

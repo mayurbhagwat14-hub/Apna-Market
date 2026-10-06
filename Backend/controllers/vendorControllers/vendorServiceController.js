@@ -224,6 +224,7 @@ const createServiceListing = async (req, res) => {
     if (!Object.keys(cleanedAnswers).length && enrollment?.dynamicAnswers) {
       cleanedAnswers = await normalizeDynamicAnswers(enrollment.dynamicAnswers, vendorId);
     }
+    delete cleanedAnswers.offer; // Offers must go through marketing approval pipeline
 
     const cleanedPricingAnswers = await normalizeDynamicAnswers(pricingFormAnswers, vendorId);
     const cleanedAvailabilityAnswers = await normalizeDynamicAnswers(availabilityFormAnswers, vendorId);
@@ -470,6 +471,7 @@ const updateServiceListing = async (req, res) => {
     }
     if (dynamicFormAnswers) {
       const cleanedAnswers = await normalizeDynamicAnswers(dynamicFormAnswers, vendorId);
+      delete cleanedAnswers.offer; // Offers must go through marketing approval pipeline
       listing.dynamicFormAnswers = { ...listing.dynamicFormAnswers, ...cleanedAnswers };
       listing.markModified('dynamicFormAnswers');
       const resolvedTitle = extractListingTitle(listing.dynamicFormAnswers, listing.catalogItems);

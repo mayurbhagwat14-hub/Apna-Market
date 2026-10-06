@@ -78,11 +78,7 @@ const ListingDetail = () => {
   const phone = business?.dynamicFormAnswers?.phone || '+91 98765 43210';
   const address = business?.dynamicFormAnswers?.address || '54, Scheme No 54, Vijay Nagar, Indore, MP';
   const tags = business?.dynamicFormAnswers?.tags || ['Dine-in', 'Takeaway', 'Outdoor Seating'];
-  const offer = business?.dynamicFormAnswers?.offer || {
-    title: '20% OFF on selected items',
-    code: 'APNA20',
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=350&auto=format&fit=crop&q=80'
-  };
+  const offer = business?.offer || null;
 
   const photos = business?.portfolioPhotos?.length > 0
     ? business.portfolioPhotos
@@ -421,7 +417,7 @@ const ListingDetail = () => {
               <p className="text-[10px] text-emerald-100/70 font-medium">Use code {offer.code || 'APNA20'} on billing</p>
             </div>
             <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 shadow-xs border border-white/20">
-              <img src={offer.image} alt="Offer" className="w-full h-full object-cover" />
+              <img src={offer.image || offer.imageUrl || "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=350&auto=format&fit=crop&q=80"} alt="Offer" className="w-full h-full object-cover" />
             </div>
           </div>
         )}

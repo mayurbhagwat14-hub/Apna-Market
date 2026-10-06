@@ -9,6 +9,7 @@ const MarketingApprovals = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
+  const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [rejectModal, setRejectModal] = useState({ open: false, vendorId: null, itemId: null, itemType: null });
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -19,6 +20,7 @@ const MarketingApprovals = () => {
       const res = await api.get('/admin/vendors/marketing-approvals', { params: { status: statusFilter } });
       if (res.data?.success) {
         setItems(res.data.data || []);
+        if (res.data.counts) setCounts(res.data.counts);
       }
     } catch (err) {
       console.error('Failed to load marketing approvals:', err);
@@ -88,13 +90,20 @@ const MarketingApprovals = () => {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all capitalize ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all capitalize flex items-center gap-1.5 ${
               statusFilter === status
                 ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                 : 'bg-white text-neutral-600 border-neutral-200 hover:border-primary-300'
             }`}
           >
-            {status}
+            <span>{status}</span>
+            {counts[status] !== undefined && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                statusFilter === status ? 'bg-white/25 text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}>
+                {counts[status]}
+              </span>
+            )}
           </button>
         ))}
       </div>

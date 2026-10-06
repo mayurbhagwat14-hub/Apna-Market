@@ -35,6 +35,48 @@ const vendorCategoryEnrollmentSchema = new mongoose.Schema({
   }
 }, { _id: true });
 
+
+const shopPhotoSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  caption: { type: String, default: '' },
+  tag: { type: String, default: 'STORE_FRONT' },
+  reviewStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  reviewedAt: { type: Date, default: null },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  rejectedReason: { type: String, default: null },
+  uploadedAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: true });
+
+const vendorOfferSchema = new mongoose.Schema({
+  title: { type: String, required: true, trim: true },
+  tagline: { type: String, default: '', trim: true },
+  discountBadge: { type: String, default: 'SPECIAL OFFER' },
+  discountPercent: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  offerType: { type: String, default: 'PERCENTAGE' },
+  code: { type: String, default: 'APNA20', uppercase: true, trim: true },
+  imageUrl: { type: String, default: '' },
+  validTill: { type: Date },
+  terms: { type: String, default: '' },
+  isActive: { type: Boolean, default: true },
+  viewsCount: { type: Number, default: 0 },
+  claimsCount: { type: Number, default: 0 },
+  reviewStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  reviewedAt: { type: Date, default: null },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  rejectedReason: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: true });
+
 const vendorSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -96,6 +138,13 @@ const vendorSchema = new mongoose.Schema({
   },
   // Per-category enrollment applications and approval status
   categoryEnrollments: [vendorCategoryEnrollmentSchema],
+  shopPhotos: [shopPhotoSchema],
+  offers: [vendorOfferSchema],
+  marketingStats: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+
   aadhar: {
     number: {
       type: String,
@@ -402,6 +451,9 @@ const vendorSchema = new mongoose.Schema({
 
 // Indexes for faster queries
 vendorSchema.index({ approvalStatus: 1 });
+vendorSchema.index({ 'offers.reviewStatus': 1 });
+vendorSchema.index({ 'shopPhotos.reviewStatus': 1 });
+
 vendorSchema.index({ 'wallet.earnings': -1 });
 vendorSchema.index({ geoLocation: '2dsphere' }); // Fast geo queries
 vendorSchema.index({ isOnline: 1, availability: 1, approvalStatus: 1 }); // Compound index for vendor search

@@ -608,8 +608,28 @@ const getVendorMarketingApprovals = async (req, res) => {
     const limitNum = parseInt(limit);
     const start = (pageNum - 1) * limitNum;
 
+    const allVendorsWithMarketing = await Vendor.find({
+      $or: [
+        { 'offers.0': { $exists: true } },
+        { 'shopPhotos.0': { $exists: true } }
+      ]
+    }).select('offers shopPhotos').lean();
+
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+    allVendorsWithMarketing.forEach((v) => {
+      (v.offers || []).forEach((o) => {
+        const s = o.reviewStatus || 'pending';
+        if (counts[s] !== undefined) counts[s]++;
+      });
+      (v.shopPhotos || []).forEach((p) => {
+        const s = p.reviewStatus || 'pending';
+        if (counts[s] !== undefined) counts[s]++;
+      });
+    });
+
     res.status(200).json({
       success: true,
+      counts,
       data: items.slice(start, start + limitNum),
       pagination: {
         page: pageNum,

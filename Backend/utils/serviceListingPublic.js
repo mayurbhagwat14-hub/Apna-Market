@@ -58,7 +58,7 @@ const listingDisplayPrice = (pricing = {}) =>
   pricing.perGuardRate ||
   0;
 
-const isApprovedMarketingItem = (item) => !item.reviewStatus || item.reviewStatus === 'approved';
+const isApprovedMarketingItem = (item) => Boolean(item && item.reviewStatus === 'approved');
 
 const toPublicListingDto = (listing) => {
   const live = overlayApprovedVersion(listing);
@@ -106,7 +106,24 @@ const toPublicListingDto = (listing) => {
       ...(approvedShopPhotos.map(p => p.url).filter(Boolean))
     ])),
     portfolioVideos: live.portfolioVideos || [],
-    offer: approvedOffers.find(o => o.isActive) || answers.offer || null,
+    offer: (() => {
+      const activeApproved = approvedOffers.find(o => o.isActive);
+      if (!activeApproved) return null;
+      return {
+        id: activeApproved._id?.toString?.() || activeApproved.id,
+        title: activeApproved.title,
+        tagline: activeApproved.tagline || '',
+        badge: activeApproved.discountBadge || `${activeApproved.discountPercent || 20}% OFF`,
+        discountBadge: activeApproved.discountBadge || 'SPECIAL OFFER',
+        discountPercent: activeApproved.discountPercent || 0,
+        discountAmount: activeApproved.discountAmount || 0,
+        code: activeApproved.code || 'APNA20',
+        image: activeApproved.imageUrl || '',
+        imageUrl: activeApproved.imageUrl || '',
+        validTill: activeApproved.validTill || null,
+        terms: activeApproved.terms || ''
+      };
+    })(),
     offers: approvedOffers,
     documents: (live.documents || []).map((d) => ({
       label: d.label,
