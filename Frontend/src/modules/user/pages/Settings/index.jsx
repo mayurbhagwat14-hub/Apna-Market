@@ -173,7 +173,7 @@ const Settings = () => {
                 const confirmed = window.confirm('Are you sure you want to log out?');
                 if (confirmed) {
                   await userAuthService.logout();
-                  navigate('/user/login');
+                  navigate('/user/login', { replace: true });
                   toast.success('Logged out successfully');
                 }
               }}

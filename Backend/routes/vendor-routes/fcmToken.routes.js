@@ -98,23 +98,11 @@ router.delete('/remove', authenticate, async (req, res) => {
     const { token, platform = 'web' } = req.body;
     const vendorId = req.user._id;
 
-    if (!token) {
-      return res.status(400).json({ success: false, error: 'Token is required' });
-    }
+    const pullQuery = token
+      ? (platform === 'mobile' ? { $pull: { fcmTokenMobile: token } } : { $pull: { fcmTokens: token } })
+      : (platform === 'mobile' ? { $set: { fcmTokenMobile: [] } } : { $set: { fcmTokens: [] } });
 
-    const vendor = await Vendor.findById(vendorId);
-    if (!vendor) {
-      return res.status(404).json({ success: false, error: 'Vendor not found' });
-    }
-
-    // Remove token based on platform
-    if (platform === 'web' && vendor.fcmTokens) {
-      vendor.fcmTokens = vendor.fcmTokens.filter(t => t !== token);
-    } else if (platform === 'mobile' && vendor.fcmTokenMobile) {
-      vendor.fcmTokenMobile = vendor.fcmTokenMobile.filter(t => t !== token);
-    }
-
-    await vendor.save();
+    await Vendor.findByIdAndUpdate(vendorId, pullQuery);
 
     res.json({ success: true, message: 'FCM token removed successfully' });
   } catch (error) {

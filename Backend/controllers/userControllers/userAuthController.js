@@ -96,7 +96,7 @@ const sendOTP = async (req, res) => {
  */
 const verifyLogin = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone, otp, fcmToken, platform = 'web' } = req.body;
 
     // 1. Verify OTP
     const verification = await verifyOTP(phone, otp);
@@ -119,12 +119,17 @@ const verifyLogin = async (req, res) => {
         });
       }
 
-      // SINGLE DEVICE LOGIN: Update Session ID & Clear OLD FCM tokens
+      // Update Session ID & Save FCM token to appropriate field if provided
       const loginSessionId = Date.now().toString();
-      await User.findByIdAndUpdate(user._id, { 
-        loginSessionId,
-        $set: { fcmTokens: [], fcmTokenMobile: [] } // Clear all old tokens
-      });
+      const updateData = { loginSessionId };
+      if (fcmToken) {
+        if (platform === 'mobile') {
+          updateData.$addToSet = { fcmTokenMobile: fcmToken };
+        } else {
+          updateData.$addToSet = { fcmTokens: fcmToken };
+        }
+      }
+      await User.findByIdAndUpdate(user._id, updateData);
       
       const tokens = generateTokenPair({
         userId: user._id,
@@ -182,7 +187,7 @@ const register = async (req, res) => {
       });
     }
 
-    const { name, email, verificationToken } = req.body;
+    const { name, email, verificationToken, fcmToken, platform = 'web' } = req.body;
     let phone = req.body.phone;
 
     // Verify token if provided (New Flow)
@@ -216,13 +221,26 @@ const register = async (req, res) => {
       });
     }
 
+    // Prepare initial FCM token based on platform
+    const initialFCM = {};
+    if (fcmToken) {
+      if (platform === 'mobile') {
+        initialFCM.fcmTokenMobile = [fcmToken];
+        initialFCM.fcmTokens = [];
+      } else {
+        initialFCM.fcmTokens = [fcmToken];
+        initialFCM.fcmTokenMobile = [];
+      }
+    }
+
     // Create user
     const user = await User.create({
       name,
       email: email || null,
       phone,
       isPhoneVerified: true,
-      isEmailVerified: email ? false : true
+      isEmailVerified: email ? false : true,
+      ...initialFCM
     });
 
     // Send Welcome Email
@@ -276,7 +294,7 @@ const login = async (req, res) => {
       });
     }
 
-    const { phone, otp } = req.body;
+    const { phone, otp, fcmToken, platform = 'web' } = req.body;
 
     // Verify OTP (checks Redis first, falls back to MongoDB)
     const verification = await verifyOTP(phone, otp);
@@ -303,12 +321,17 @@ const login = async (req, res) => {
       });
     }
 
-    // SINGLE DEVICE LOGIN: Update Session ID & Clear OLD FCM tokens
+    // Update Session ID & Save FCM token if provided
     const loginSessionId = Date.now().toString();
-    await User.findByIdAndUpdate(user._id, { 
-      loginSessionId,
-      $set: { fcmTokens: [], fcmTokenMobile: [] } // Clear all old tokens
-    });
+    const updateData = { loginSessionId };
+    if (fcmToken) {
+      if (platform === 'mobile') {
+        updateData.$addToSet = { fcmTokenMobile: fcmToken };
+      } else {
+        updateData.$addToSet = { fcmTokens: fcmToken };
+      }
+    }
+    await User.findByIdAndUpdate(user._id, updateData);
 
     const tokens = generateTokenPair({
       userId: user._id,
@@ -343,16 +366,24 @@ const login = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    const { platform = 'web' } = req.body;
+    const { platform = 'web', token } = req.body;
 
-    // Clear FCM tokens based on platform and reset session
-    if (req.user && req.user.id) {
-      const updateQuery = platform === 'mobile'
-        ? { $set: { fcmTokenMobile: [], loginSessionId: null } }
-        : { $set: { fcmTokens: [], loginSessionId: null } };
+    // Clear FCM tokens based on platform/token and reset session
+    const userId = req.user && (req.user.id || req.user._id);
+    if (userId) {
+      let updateQuery;
+      if (token) {
+        updateQuery = platform === 'mobile'
+          ? { $pull: { fcmTokenMobile: token }, loginSessionId: null }
+          : { $pull: { fcmTokens: token }, loginSessionId: null };
+      } else {
+        updateQuery = platform === 'mobile'
+          ? { $set: { fcmTokenMobile: [], loginSessionId: null } }
+          : { $set: { fcmTokens: [], loginSessionId: null } };
+      }
 
-      await User.findByIdAndUpdate(req.user.id, updateQuery);
-      console.log(`[AUTH] ✅ ${platform} session & tokens cleared for user: ${req.user.id}`);
+      await User.findByIdAndUpdate(userId, updateQuery);
+      console.log(`[AUTH] ✅ ${platform} session & tokens cleared for user: ${userId}`);
     }
 
     res.status(200).json({

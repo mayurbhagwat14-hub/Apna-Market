@@ -1,5 +1,5 @@
 import api from '../../../services/api';
-import { registerFCMToken } from '../../../services/pushNotificationService';
+import { registerFCMToken, removeFCMToken, getPlatformType } from '../../../services/pushNotificationService';
 
 /**
  * Notify Flutter WebView about successful login
@@ -89,9 +89,12 @@ export const login = async (credentials) => {
   try {
     const response = await api.post('/vendors/auth/login', credentials);
 
-    // Store tokens in localStorage
+    // Store tokens in localStorage and register FCM token
     if (response.data.success && response.data.accessToken) {
       storeVendorSession(response.data);
+      registerFCMToken('vendor', true).catch(err => {
+        console.error('[VENDOR AUTH] FCM token registration failed:', err);
+      });
     }
 
     return response.data;
@@ -107,7 +110,13 @@ export const login = async (credentials) => {
  */
 export const logout = async () => {
   try {
-    const response = await api.post('/vendors/auth/logout');
+    const platform = getPlatformType();
+    try {
+      await removeFCMToken('vendor');
+    } catch (fcmErr) {
+      console.warn('FCM token removal failed:', fcmErr);
+    }
+    const response = await api.post('/vendors/auth/logout', { platform });
     return response.data;
   } catch (error) {
     console.error('Error logging out:', error);

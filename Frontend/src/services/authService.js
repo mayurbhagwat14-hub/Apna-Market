@@ -1,5 +1,5 @@
-import api from './api';
-import { registerFCMToken, removeFCMToken } from './pushNotificationService';
+import api, { apiCache } from './api';
+import { registerFCMToken, removeFCMToken, getPlatformType } from './pushNotificationService';
 
 /**
  * Notify Flutter WebView about successful login
@@ -17,14 +17,6 @@ function notifyFlutterLogin(responseData) {
   } catch (e) {
     console.error('[AUTH] Error notifying Flutter:', e);
   }
-}
-
-/**
- * Get the current platform type (web or mobile)
- * @returns {'web' | 'mobile'}
- */
-function getPlatformType() {
-  return (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) ? 'mobile' : 'web';
 }
 
 function storeUserSession({ accessToken, refreshToken, user }) {
@@ -88,16 +80,32 @@ export const userAuthService = {
 
   // Logout
   logout: async () => {
-    // Remove FCM token before logout
-    await removeFCMToken('user');
+    try {
+      await removeFCMToken('user');
+    } catch (e) {
+      console.warn('Remove FCM token error:', e);
+    }
     try {
       await api.post('/users/auth/logout', { platform: getPlatformType() });
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      const keys = [
+        'accessToken',
+        'refreshToken',
+        'userData',
+        'userAddress',
+        'userLocation',
+        'userSelectedLocation',
+        'cart',
+        'checkoutData'
+      ];
+      keys.forEach((k) => {
+        try { localStorage.removeItem(k); } catch {}
+        try { sessionStorage.removeItem(k); } catch {}
+      });
+      try { apiCache.clear(); } catch {}
     }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userData');
   },
 
   // Get profile
@@ -286,16 +294,27 @@ export const workerAuthService = {
 
   // Logout
   logout: async () => {
-    // Remove FCM token before logout
-    await removeFCMToken('worker');
+    try {
+      await removeFCMToken('worker');
+    } catch (e) {
+      console.warn('Remove FCM token error:', e);
+    }
     try {
       await api.post('/workers/auth/logout', { platform: getPlatformType() });
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      const keys = [
+        'workerAccessToken',
+        'workerRefreshToken',
+        'workerData'
+      ];
+      keys.forEach((k) => {
+        try { localStorage.removeItem(k); } catch {}
+        try { sessionStorage.removeItem(k); } catch {}
+      });
+      try { apiCache.clear(); } catch {}
     }
-    localStorage.removeItem('workerAccessToken');
-    localStorage.removeItem('workerRefreshToken');
-    localStorage.removeItem('workerData');
   },
 
   // Get profile

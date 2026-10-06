@@ -70,13 +70,16 @@ const Account = () => {
     try {
       await userAuthService.logout();
       toast.success('Logged out successfully');
-      navigate('/user/login');
+      navigate('/user/login', { replace: true });
     } catch (error) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userData');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('userData');
       toast.success('Logged out successfully');
-      navigate('/user/login');
+      navigate('/user/login', { replace: true });
     }
   };
 

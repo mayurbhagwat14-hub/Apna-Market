@@ -8,19 +8,11 @@ import { messaging, getToken, onMessage } from '../firebase';
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 /**
- * Check if running inside Flutter WebView
- * @returns {boolean}
+ * Get the platform type for this web app (always 'web' since this is browser-based)
+ * @returns {'web'}
  */
-function isFlutterWebView() {
-  return !!(window.flutter_inappwebview && window.flutter_inappwebview.callHandler);
-}
-
-/**
- * Get the current platform type
- * @returns {'web' | 'mobile'}
- */
-function getPlatformType() {
-  return isFlutterWebView() ? 'mobile' : 'web';
+export function getPlatformType() {
+  return 'web';
 }
 
 /**
@@ -101,34 +93,23 @@ async function getFCMToken() {
  */
 async function registerFCMToken(userType = 'user', forceUpdate = false) {
   try {
-    // console.log(`[FCM] Starting registration for ${userType}, forceUpdate: ${forceUpdate}`);
-
-    // Check if already registered
-    const storageKey = `fcm_token_${userType}_web`;
-    const savedToken = localStorage.getItem(storageKey);
-    if (savedToken && !forceUpdate) {
-      // console.log('[FCM] Token already registered in localStorage');
-      return savedToken;
-    }
+    const platform = getPlatformType();
 
     // Request permission
-    // console.log('[FCM] Requesting notification permission...');
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      // console.log('[FCM] ❌ Notification permission not granted, skipping FCM registration');
+      console.log('[FCM] Notification permission not granted');
       return null;
     }
 
-    // Get token
-    // console.log('[FCM] Getting FCM token from Firebase...');
+    // Get token from Firebase
     const token = await getFCMToken();
     if (!token) {
-      // console.log('[FCM] ❌ Failed to get FCM token from Firebase');
+      console.log('[FCM] Failed to obtain FCM token from Firebase');
       return null;
     }
-    // console.log('[FCM] ✅ Got FCM token:', token.substring(0, 30) + '...');
 
-    // Determine API endpoint based on user type
+    // Determine API endpoint and auth token key
     let endpoint;
     let authTokenKey;
     switch (userType) {
@@ -141,25 +122,20 @@ async function registerFCMToken(userType = 'user', forceUpdate = false) {
         authTokenKey = 'workerAccessToken';
         break;
       case 'user':
+      default:
         endpoint = '/users/fcm-tokens/save';
         authTokenKey = 'accessToken';
         break;
-      default:
-        // console.warn(`[FCM] Unknown userType: ${userType}, defaulting to user`);
-        endpoint = '/users/fcm-tokens/save';
-        authTokenKey = 'accessToken';
     }
 
-    // Get auth token
     const authToken = localStorage.getItem(authTokenKey);
     if (!authToken) {
-      // console.log(`[FCM] ❌ No auth token found for ${userType} (${authTokenKey}), skipping registration`);
+      console.log(`[FCM] No auth token found for ${userType}, skipping registration`);
       return null;
     }
 
-    // Save to backend
+    // Save directly to MongoDB Database under appropriate field (fcmTokens or fcmTokenMobile)
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-    // console.log(`[FCM] Saving to backend: ${baseUrl}${endpoint}`);
 
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
@@ -169,46 +145,32 @@ async function registerFCMToken(userType = 'user', forceUpdate = false) {
       },
       body: JSON.stringify({
         token: token,
-        platform: 'web'
+        platform: platform // 'web' or 'mobile'
       })
     });
 
-    // console.log(`[FCM] Backend response status: ${response.status}`);
-
     if (response.ok) {
-      localStorage.setItem(storageKey, token);
-      // console.log('[FCM] ✅ FCM token registered with backend successfully!');
+      console.log(`[FCM] ✅ FCM token saved to database (${platform}) successfully!`);
       return token;
     } else {
       const error = await response.json();
-      // console.error('[FCM] ❌ Failed to register token with backend:', error);
+      console.error('[FCM] ❌ Failed to register token with backend database:', error);
       return null;
     }
   } catch (error) {
-    // console.error('[FCM] ❌ Error registering FCM token:', error);
+    console.error('[FCM] Error registering FCM token:', error);
     return null;
   }
 }
 
 /**
- * Remove FCM token from backend (removes specific token for current device)
+ * Remove FCM token from backend database on logout
  * @param {string} userType - 'user', 'vendor', or 'worker'
  */
 async function removeFCMToken(userType = 'user') {
   try {
-    // Detect platform automatically
     const platform = getPlatformType();
-    const storageKey = `fcm_token_${userType}_${platform}`;
-    const tokenToRemove = localStorage.getItem(storageKey);
 
-    if (!tokenToRemove) {
-      // console.log('[FCM] No token found in localStorage to remove');
-      return;
-    }
-
-    // console.log(`[FCM] Removing ${platform} token for ${userType}...`);
-
-    // Determine API endpoint based on user type
     let endpoint;
     let authTokenKey;
     switch (userType) {
@@ -220,40 +182,33 @@ async function removeFCMToken(userType = 'user') {
         endpoint = '/workers/fcm-tokens/remove';
         authTokenKey = 'workerAccessToken';
         break;
+      case 'user':
       default:
         endpoint = '/users/fcm-tokens/remove';
         authTokenKey = 'accessToken';
     }
 
-    const authToken = localStorage.getItem(authTokenKey);
-    // If we have an auth token, try to remove from backend
-    if (authToken) {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-      // Call remove endpoint with specific token
-      await fetch(`${baseUrl}${endpoint}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          token: tokenToRemove,
-          platform: platform
-        })
-      });
-      console.log(`[FCM] ✅ Token removed from backend`);
+    const authToken = localStorage.getItem(authTokenKey) || sessionStorage.getItem(authTokenKey);
+    if (!authToken) {
+      return;
     }
 
-    // Always remove from local storage
-    localStorage.removeItem(storageKey);
-    console.log(`[FCM] Token cleared from localStorage`);
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+    // Remove token from database
+    await fetch(`${baseUrl}${endpoint}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        platform: platform
+      })
+    });
+    console.log(`[FCM] ✅ Token removed from database for ${platform}`);
   } catch (error) {
-    console.error('[FCM] Error removing FCM token:', error);
-    // Ensure local cleanup happens even on error
-    const platform = getPlatformType();
-    const storageKey = `fcm_token_${userType}_${platform}`;
-    localStorage.removeItem(storageKey);
+    console.error('[FCM] Error removing FCM token from database:', error);
   }
 }
 
