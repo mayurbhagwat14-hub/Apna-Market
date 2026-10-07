@@ -16,7 +16,31 @@ export default defineConfig({
     minify: 'esbuild',
     cssMinify: 'esbuild',
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {},
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('recharts')) {
+              return 'vendor-recharts';
+            }
+            if (id.includes('framer-motion') || id.includes('gsap')) {
+              return 'vendor-motion';
+            }
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('leaflet') || id.includes('@react-google-maps')) {
+              return 'vendor-maps';
+            }
+            if (id.includes('react-icons')) {
+              return 'vendor-icons';
+            }
+          }
+        },
+      },
+    },
   },
 });
