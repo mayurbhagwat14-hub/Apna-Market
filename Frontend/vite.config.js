@@ -20,10 +20,13 @@ export default defineConfig(({ command }) => ({
     legalComments: 'none',
   },
   build: {
-    target: 'es2022',
+    target: 'esnext',
     minify: 'esbuild',
     cssMinify: 'esbuild',
+    cssCodeSplit: false,
+    sourcemap: false,
     reportCompressedSize: false,
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks(id) {
