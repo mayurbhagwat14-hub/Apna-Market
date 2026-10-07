@@ -4,20 +4,46 @@ const { authenticateSocket } = require('../middleware/authMiddleware');
 
 let io = null;
 
+const allowedSocketOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://apnamarkket.in',
+  'https://www.apnamarkket.in',
+  'https://api.apnamarkket.in',
+  'https://apnamarket.in',
+  'https://www.apnamarket.in',
+  'https://api.apnamarket.in',
+  'https://www.homster.in',
+  'https://homster.in',
+  'https://api.homster.in'
+];
+
+if (process.env.FRONTEND_URL) {
+  const envOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
+  envOrigins.forEach(origin => {
+    if (!allowedSocketOrigins.includes(origin)) allowedSocketOrigins.push(origin);
+  });
+}
+
 const initializeSocket = (server) => {
   io = new Server(server, {
     pingTimeout: 60000,
     pingInterval: 25000,
     cors: {
-      origin: [
-        ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(url => url.trim()) : []),
-        'http://localhost:5173', 
-        'http://127.0.0.1:5173',
-        'https://apnamarkket.in',
-        'https://www.apnamarkket.in',
-        'https://apnamarket.in',
-        'https://www.apnamarket.in'
-      ],
+      origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (
+          allowedSocketOrigins.indexOf(origin) !== -1 ||
+          origin.includes('.vercel.app') ||
+          origin.includes('apnamarkket.in') ||
+          origin.includes('apnamarket.in') ||
+          /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+        ) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
       methods: ["GET", "POST"]
     },
