@@ -31,6 +31,12 @@ app.use(helmet({
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'https://apnamarkket.in',
+  'https://www.apnamarkket.in',
+  'https://api.apnamarkket.in',
+  'https://apnamarket.in',
+  'https://www.apnamarket.in',
+  'https://api.apnamarket.in',
   'https://www.homster.in',
   'https://homster.in',
   'https://api.homster.in'
@@ -55,6 +61,8 @@ app.use(cors({
     if (
       allowedOrigins.indexOf(origin) !== -1 ||
       origin.includes('.vercel.app') ||
+      origin.includes('apnamarkket.in') ||
+      origin.includes('apnamarket.in') ||
       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
     ) {
       callback(null, true);
@@ -65,7 +73,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
 // CORS configuration finished above
@@ -185,6 +193,7 @@ app.use('/api/vendors', require('./routes/vendor-routes/service.routes'));
 app.use('/api/vendors/bookings', require('./routes/vendor-routes/booking.routes'));
 
 app.use('/api/vendors/fcm-tokens', require('./routes/vendor-routes/fcmToken.routes'));
+app.use('/api/workers/fcm-tokens', require('./routes/vendor-routes/fcmToken.routes'));
 app.use('/api/vendors', require('./routes/vendor-routes/vendorBill.routes'));
 app.use('/api/vendors/catalog', require('./routes/vendor-routes/catalog.routes'));
 app.use('/api/vendors/marketing', require('./routes/vendor-routes/marketing.routes'));

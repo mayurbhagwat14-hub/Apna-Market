@@ -128,7 +128,7 @@ async function registerFCMToken(userType = 'user', forceUpdate = false) {
         break;
     }
 
-    const authToken = localStorage.getItem(authTokenKey);
+    const authToken = localStorage.getItem(authTokenKey) || sessionStorage.getItem(authTokenKey);
     if (!authToken) {
       console.log(`[FCM] No auth token found for ${userType}, skipping registration`);
       return null;
