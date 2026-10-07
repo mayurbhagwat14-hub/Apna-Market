@@ -58,6 +58,11 @@ if (!admin.apps.length && serviceAccount) {
  */
 async function sendPushNotification(tokens, payload) {
   try {
+    if (!admin.apps.length) {
+      console.warn('[FCM] Firebase Admin SDK is not initialized. Please configure FIREBASE_CONFIG or FIREBASE_SERVICE_ACCOUNT_JSON.');
+      throw new Error('Firebase Admin SDK is not initialized on the backend. Please add Firebase Service Account JSON credentials.');
+    }
+
     if (!tokens || tokens.length === 0) {
       console.log('No FCM tokens provided');
       return { successCount: 0, failureCount: 0 };

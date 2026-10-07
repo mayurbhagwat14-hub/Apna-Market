@@ -25,7 +25,6 @@ import Header from '../../components/layout/Header';
 import { vendorDashboardService } from '../../services/dashboardService';
 import vendorMarketingService from '../../services/vendorMarketingService';
 import api from '../../../../services/api';
-import { registerFCMToken } from '../../../../services/pushNotificationService';
 import LogoLoader from '../../../../components/common/LogoLoader';
 import toast from 'react-hot-toast';
 
@@ -271,8 +270,6 @@ const Dashboard = memo(() => {
 
   // Event listeners for real-time updates
   useEffect(() => {
-    registerFCMToken('vendor', true).catch(err => console.error('FCM registration failed:', err));
-
     const handleUpdate = () => {
       loadMarketingData();
     };

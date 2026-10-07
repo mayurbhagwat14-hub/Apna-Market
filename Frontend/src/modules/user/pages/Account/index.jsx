@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { userAuthService } from '../../../../services/authService';
 import { useSaved } from '../../../../context/SavedContext';
+import { sendTestPushNotification } from '../../../../services/pushNotificationService';
 import {
   FiEdit2,
   FiCompass,
@@ -29,6 +30,20 @@ const Account = () => {
     followersCount: 28,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
+
+  const handleTestNotification = async () => {
+    setIsSendingTestNotif(true);
+    const toastId = toast.loading('Sending test notification...');
+    try {
+      const res = await sendTestPushNotification('user');
+      toast.success(res.message || 'Test notification sent! Check your notification bar.', { id: toastId });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send notification', { id: toastId });
+    } finally {
+      setIsSendingTestNotif(false);
+    }
+  };
 
   // Fetch user profile from database
   useEffect(() => {
@@ -205,6 +220,27 @@ const Account = () => {
               </button>
             );
           })}
+        </div>
+
+        {/* Test Push Notification Card */}
+        <div className="bg-white rounded-2xl border border-emerald-100/80 p-4 shadow-xs flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#016A54] flex items-center justify-center">
+              <FiBell className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900">Push Notification Test</p>
+              <p className="text-[11px] text-gray-500">Test notification via saved FCM Token</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            disabled={isSendingTestNotif}
+            className="px-3.5 py-2 rounded-xl bg-[#016A54] hover:bg-[#015B48] active:scale-95 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+          >
+            {isSendingTestNotif ? 'Sending...' : 'Test Now 🔔'}
+          </button>
         </div>
 
         {/* Bottom "Support Local" Card (Matches Screen 7) */}

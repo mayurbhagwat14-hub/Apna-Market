@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiUser, FiEdit2, FiMapPin, FiPhone, FiMail, FiBriefcase, FiStar, FiArrowRight, FiSettings, FiChevronRight, FiCreditCard, FiLogOut, FiTrash2, FiLayers, FiFileText, FiPackage } from 'react-icons/fi';
+import { FiUser, FiEdit2, FiMapPin, FiPhone, FiMail, FiBriefcase, FiStar, FiArrowRight, FiSettings, FiChevronRight, FiCreditCard, FiLogOut, FiTrash2, FiLayers, FiFileText, FiPackage, FiBell } from 'react-icons/fi';
 import { FaWallet } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors, gradients } from '../../../../theme';
 import { vendorAuthService } from '../../../../services/authService';
+import { sendTestPushNotification } from '../../../../services/pushNotificationService';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
 import LogoLoader from '../../../../components/common/LogoLoader';
@@ -14,6 +15,20 @@ import { Button } from '../../../../components/ui';
 const Profile = () => {
   const { branding } = useBranding();
   const navigate = useNavigate();
+  const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
+
+  const handleTestNotification = async () => {
+    setIsSendingTestNotif(true);
+    const toastId = toast.loading('Sending test notification to vendor...');
+    try {
+      const res = await sendTestPushNotification('vendor');
+      toast.success(res.message || 'Test notification sent! Check your notification bar.', { id: toastId });
+    } catch (err) {
+      toast.error(err.message || 'Failed to send notification', { id: toastId });
+    } finally {
+      setIsSendingTestNotif(false);
+    }
+  };
 
   // Helper function to convert hex to rgba
   const hexToRgba = (hex, alpha) => {
@@ -279,6 +294,27 @@ const Profile = () => {
               </button>
             );
           })}
+        </div>
+
+        {/* Test Push Notification Card */}
+        <div className="bg-white rounded-[24px] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] border border-emerald-100 p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#016A54] flex items-center justify-center">
+              <FiBell className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-800">Push Notification Test</p>
+              <p className="text-xs text-gray-500">Test notification with saved FCM token</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            disabled={isSendingTestNotif}
+            className="px-4 py-2.5 rounded-xl bg-[#016A54] hover:bg-[#015B48] active:scale-95 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+          >
+            {isSendingTestNotif ? 'Sending...' : 'Test Now 🔔'}
+          </button>
         </div>
 
         {/* Logout */}

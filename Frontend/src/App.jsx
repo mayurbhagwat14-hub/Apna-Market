@@ -30,6 +30,51 @@ function App() {
 
     // Setup foreground notification handler
     setupForegroundNotificationHandler((payload) => {
+      const notification = payload.notification || {};
+      const data = payload.data || {};
+      const notifTitle = notification.title || data.title || '🔔 New Notification';
+      const notifBody = notification.body || data.body || '';
+
+      // Play notification sound
+      try {
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(() => {});
+      } catch (err) {}
+
+      // Show in-app Toast popup
+      toast.custom(
+        (t) => (
+          <div
+            onClick={() => {
+              toast.dismiss(t.id);
+              if (data.link) window.location.href = data.link;
+            }}
+            className={`${
+              t.visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex p-4 cursor-pointer hover:bg-gray-50 transition-all border border-emerald-100 items-start gap-3`}
+          >
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#016A54] flex items-center justify-center flex-shrink-0 text-xl">
+              🔔
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate">{notifTitle}</p>
+              <p className="mt-0.5 text-xs text-gray-600 line-clamp-2">{notifBody}</p>
+            </div>
+          </div>
+        ),
+        { duration: 5000, position: 'top-right' }
+      );
+
+      // Try browser system notification if supported and granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(notifTitle, {
+            body: notifBody,
+            icon: '/Homster-logo.png'
+          });
+        } catch (e) {}
+      }
+
       // Debounced refresh — avoid API storms when many pushes arrive
       clearTimeout(window.__apnaMarketNotifRefreshTimer);
       window.__apnaMarketNotifRefreshTimer = setTimeout(() => {

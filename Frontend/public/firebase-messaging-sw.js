@@ -179,14 +179,14 @@ messaging.onBackgroundMessage((payload) => {
     timestamp: Date.now()
   };
 
-  // Show the notification ONLY if app is not in foreground (to avoid duplicate with in-app socket toast)
+  // Show the notification ONLY if app is not in foreground, or if this is a test notification
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     .then(function (clientList) {
       const isVisible = clientList.some(function (client) {
         return client.visibilityState === 'visible';
       });
 
-      if (isVisible) {
+      if (isVisible && notificationType !== 'test') {
         console.log('[SW] 🚫 App is visible, skipping system notification to avoid duplicate');
         return;
       }

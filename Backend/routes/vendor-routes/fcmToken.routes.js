@@ -158,15 +158,15 @@ router.post('/test', authenticate, async (req, res) => {
     const uniqueTokens = [...new Set(tokens)];
 
     if (uniqueTokens.length === 0) {
-      return res.json({ success: false, error: 'No FCM tokens found for vendor' });
+      return res.status(400).json({ success: false, error: 'No FCM tokens found for vendor. Please allow notifications in browser first.' });
     }
 
     const response = await sendPushNotification(uniqueTokens, {
       title: '🔔 Test Notification',
-      body: 'This is a test notification for vendor!',
+      body: 'Hello Vendor! This is a test push notification from Apna Market 🚀',
       data: {
         type: 'test',
-        link: '/vendor/dashboard'
+        link: '/vendor/profile'
       }
     });
 

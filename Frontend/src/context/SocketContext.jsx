@@ -4,7 +4,6 @@ import { io } from 'socket.io-client';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { playNotificationSound, isSoundEnabled, playAlertRing } from '../utils/notificationSound';
-import { registerFCMToken } from '../services/pushNotificationService';
 
 const SwipeableNotification = ({ t, data, onClick }) => {
   const x = useMotionValue(0);
@@ -162,22 +161,6 @@ export const SocketProvider = ({ children }) => {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      // console.log(`✅ ${userType.toUpperCase()} App Socket connected`);
-
-      // Register FCM token for push notifications (on page load/refresh)
-      if (userType && token) {
-        // console.log(`[SocketContext] Registering FCM token for ${userType}...`);
-        registerFCMToken(userType, true).then((fcmToken) => {
-          if (fcmToken) {
-            // console.log(`[SocketContext] ✅ FCM token registered for ${userType}`);
-          } else {
-            // console.log(`[SocketContext] ⚠️ FCM token registration returned null for ${userType}`);
-          }
-        }).catch((err) => {
-          // console.error(`[SocketContext] ❌ FCM token registration failed for ${userType}:`, err);
-        });
-      }
-
       // If vendor, join vendor-specific room just in case backend expects it
       if (userType === 'vendor') {
         const vendorData = JSON.parse(localStorage.getItem('vendorData') || '{}');

@@ -204,8 +204,9 @@ async function removeFCMToken(userType = 'user') {
     }
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    const token = await getFCMToken().catch(() => null);
 
-    // Remove token from database
+    // Remove only this device's token from database
     await fetch(`${baseUrl}${endpoint}`, {
       method: 'DELETE',
       headers: {
@@ -213,6 +214,7 @@ async function removeFCMToken(userType = 'user') {
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
+        token: token,
         platform: platform
       })
     });
@@ -274,11 +276,42 @@ async function initializePushNotifications() {
   }
 }
 
+/**
+ * Send a test push notification to this user/vendor via backend
+ * @param {'user' | 'vendor'} userType
+ */
+async function sendTestPushNotification(userType = 'user') {
+  const endpoint = userType === 'vendor' ? '/vendors/fcm-tokens/test' : '/users/fcm-tokens/test';
+  const authTokenKey = userType === 'vendor' ? 'vendorAccessToken' : 'accessToken';
+  const authToken = localStorage.getItem(authTokenKey) || sessionStorage.getItem(authTokenKey);
+
+  if (!authToken) {
+    throw new Error(`Authentication token not found for ${userType}. Please login first.`);
+  }
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  const response = await fetch(`${baseUrl}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    }
+  });
+
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || data.message || 'Failed to send test push notification');
+  }
+
+  return data;
+}
+
 export {
   initializePushNotifications,
   registerFCMToken,
   removeFCMToken,
   setupForegroundNotificationHandler,
   requestNotificationPermission,
-  getFCMToken
+  getFCMToken,
+  sendTestPushNotification
 };

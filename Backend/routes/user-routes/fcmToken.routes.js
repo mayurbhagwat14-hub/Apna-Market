@@ -160,15 +160,15 @@ router.post('/test', authenticate, async (req, res) => {
     const uniqueTokens = [...new Set(tokens)];
 
     if (uniqueTokens.length === 0) {
-      return res.json({ success: false, error: 'No FCM tokens found for user' });
+      return res.status(400).json({ success: false, error: 'No FCM tokens found for user. Please allow notifications in browser first.' });
     }
 
     const response = await sendPushNotification(uniqueTokens, {
       title: '🔔 Test Notification',
-      body: 'This is a test notification from Appzeto!',
+      body: 'Hello! This is a test push notification from Apna Market 🚀',
       data: {
         type: 'test',
-        link: '/'
+        link: '/user/account'
       }
     });
 
