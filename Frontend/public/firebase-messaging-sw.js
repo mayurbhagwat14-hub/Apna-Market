@@ -8,19 +8,22 @@
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// Firebase configuration - Production values
+// Parse Firebase configuration dynamically from registration URL query parameters
+const params = new URLSearchParams(self.location.search);
 const firebaseConfig = {
-  apiKey: 'AIzaSyCk1rvv-xj78T2vSGAYNUFlu89AsmLJHLA',
-  authDomain: 'apnamarket-489d7.firebaseapp.com',
-  projectId: 'apnamarket-489d7',
-  storageBucket: 'apnamarket-489d7.firebasestorage.app',
-  messagingSenderId: '758901753177',
-  appId: '1:758901753177:web:09d2f0b725e8d1553c3848',
-  measurementId: 'G-DJVD37PHTV'
+  apiKey: params.get('apiKey'),
+  authDomain: params.get('authDomain'),
+  projectId: params.get('projectId'),
+  storageBucket: params.get('storageBucket'),
+  messagingSenderId: params.get('messagingSenderId'),
+  appId: params.get('appId'),
+  measurementId: params.get('measurementId')
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Initialize Firebase only if config is present
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+  firebase.initializeApp(firebaseConfig);
+}
 
 // Get messaging instance
 const messaging = firebase.messaging();
