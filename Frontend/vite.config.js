@@ -3,11 +3,19 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     react(),
-  ],
+    command === 'build' && {
+      name: 'exit-on-build-finish',
+      closeBundle() {
+        setTimeout(() => {
+          process.exit(0);
+        }, 300);
+      },
+    },
+  ].filter(Boolean),
   esbuild: {
     legalComments: 'none',
   },
@@ -43,4 +51,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
