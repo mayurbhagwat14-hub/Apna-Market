@@ -5,6 +5,7 @@ import { FaStar, FaHeart } from 'react-icons/fa';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { useCity } from '../../../../context/CityContext';
 import { useSaved } from '../../../../context/SavedContext';
+import { sortShopsByProximity } from '../../../../utils/distance';
 
 const subcategoryMap = {
   clothing: ['All', 'Men', 'Women', 'Kids', 'Ethnic', 'Casual'],
@@ -20,7 +21,7 @@ const CategoryListings = () => {
   const { categoryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentCity } = useCity();
+  const { currentCity, userLocation } = useCity();
   const { isSaved, toggleSaved } = useSaved();
 
   const [category, setCategory] = useState(location.state?.category || null);
@@ -49,13 +50,21 @@ const CategoryListings = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await publicCatalogService.getProviderListings({
+        const params = {
           categoryId,
           page: 1,
           limit: 50,
-        });
+        };
+        if (currentCity?.name) params.city = currentCity.name;
+        if (userLocation?.lat && userLocation?.lng) {
+          params.lat = userLocation.lat;
+          params.lng = userLocation.lng;
+        }
+
+        const res = await publicCatalogService.getProviderListings(params);
         if (cancelled) return;
-        setListings(res.listings || []);
+        const sorted = sortShopsByProximity(res.listings || [], userLocation);
+        setListings(sorted);
       } catch (err) {
         console.error(err);
         if (!cancelled) setListings([]);
@@ -65,7 +74,7 @@ const CategoryListings = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [categoryId, currentCity?.name]);
+  }, [categoryId, currentCity?.name, userLocation?.lat, userLocation?.lng]);
 
   const catName = category?.name || category?.title || 'Category';
   const catSlug = (category?.slug || catName).toLowerCase().replace(/\s+/g, '-');
@@ -218,7 +227,7 @@ const CategoryListings = () => {
               const img = item.images?.[0] || item.coverImage || item.image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&auto=format&fit=crop&q=80';
               const rating = item.rating || item.ratingAverage || 4.5;
               const reviews = item.reviewsCount || item.reviewCount || item.ratingsCount || 120;
-              const distance = item.distance || '1.2 km';
+              const distance = item.distance || (item.distanceKm ? `${item.distanceKm.toFixed(1)} km` : 'Nearby');
               const saved = isSaved(id);
 
               return (

@@ -512,12 +512,20 @@ const getPublicHomeData = async (req, res) => {
  */
 const getPublicServiceListings = async (req, res) => {
   try {
-    const { categoryId, categorySlug, city, search, page = 1, limit = 20 } = req.query;
+    const { categoryId, categorySlug, city, search, lat, lng, radiusKm, page = 1, limit = 20 } = req.query;
     const ServiceListing = require('../../models/ServiceListing');
     const Vendor = require('../../models/Vendor');
     const { LIVE_PUBLIC_QUERY, toPublicListingDto } = require('../../utils/serviceListingPublic');
 
     const andClauses = [LIVE_PUBLIC_QUERY];
+
+    const { syncApprovedVendorListings } = require('../../utils/vendorListingSync');
+    // Ensure newly approved vendors have active listings
+    try {
+      await syncApprovedVendorListings();
+    } catch (syncErr) {
+      console.warn('Vendor listing sync notice:', syncErr?.message);
+    }
 
     if (categoryId) {
       const Category = require('../../models/Category');
@@ -538,27 +546,79 @@ const getPublicServiceListings = async (req, res) => {
         }
       }
     }
-    if (categorySlug) {
+    if (categorySlug && categorySlug !== 'all') {
       const Category = require('../../models/Category');
-      const cat = await Category.findOne({ slug: categorySlug });
+      const cat = await Category.findOne({
+        $or: [
+          { slug: categorySlug.toLowerCase() },
+          { title: { $regex: new RegExp(`^${categorySlug}$`, 'i') } }
+        ]
+      });
       if (cat) andClauses.push({ categoryId: cat._id });
     }
     if (city) {
+      const cityClean = city.trim();
+      const cityVendors = await Vendor.find({
+        approvalStatus: 'approved',
+        accountStatus: { $nin: ['SUSPENDED', 'BLOCKED'] },
+        'address.city': { $regex: cityClean, $options: 'i' }
+      }).select('_id').lean();
+      const cityVendorIds = cityVendors.map((v) => v._id);
+
       andClauses.push({
         $or: [
-          { 'serviceArea.city': { $regex: city, $options: 'i' } },
-          { 'serviceArea.areas': { $regex: city, $options: 'i' } }
+          { 'serviceArea.city': { $regex: cityClean, $options: 'i' } },
+          { 'serviceArea.areas': { $regex: cityClean, $options: 'i' } },
+          { vendorId: { $in: cityVendorIds } }
         ]
       });
     }
-    if (search) {
-      andClauses.push({
-        $or: [
-          { title: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
-          { shortDescription: { $regex: search, $options: 'i' } }
-        ]
-      });
+    if (search && search.trim()) {
+      const trimmed = search.trim();
+      const escaped = trimmed.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+
+      const Category = require('../../models/Category');
+      const [matchedVendors, matchedCats] = await Promise.all([
+        Vendor.find({
+          approvalStatus: 'approved',
+          accountStatus: { $nin: ['SUSPENDED', 'BLOCKED'] },
+          $or: [
+            { name: { $regex: searchRegex } },
+            { businessName: { $regex: searchRegex } },
+            { 'businessDetails.businessName': { $regex: searchRegex } },
+            { 'serviceDetails.Shops.shopName': { $regex: searchRegex } }
+          ]
+        }).select('_id').lean(),
+        Category.find({
+          $or: [
+            { title: { $regex: searchRegex } },
+            { slug: { $regex: searchRegex } }
+          ]
+        }).select('_id').lean()
+      ]);
+
+      const matchedVendorIds = matchedVendors.map((v) => v._id);
+      const matchedCatIds = matchedCats.map((c) => c._id);
+
+      const searchOr = [
+        { title: { $regex: searchRegex } },
+        { categoryName: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } },
+        { shortDescription: { $regex: searchRegex } },
+        { 'dynamicFormAnswers.shopName': { $regex: searchRegex } },
+        { 'dynamicFormAnswers.vendorName': { $regex: searchRegex } },
+        { 'catalogItems.name': { $regex: searchRegex } }
+      ];
+
+      if (matchedVendorIds.length > 0) {
+        searchOr.push({ vendorId: { $in: matchedVendorIds } });
+      }
+      if (matchedCatIds.length > 0) {
+        searchOr.push({ categoryId: { $in: matchedCatIds } });
+      }
+
+      andClauses.push({ $or: searchOr });
     }
 
     const activeVendors = await Vendor.find({
@@ -581,15 +641,53 @@ const getPublicServiceListings = async (req, res) => {
       ServiceListing.countDocuments(query)
     ]);
 
-    const validListings = listings.map(toPublicListingDto).filter(Boolean);
-    validListings.sort((a, b) => {
-      const ratingA = Number(a.provider?.rating) || 0;
-      const ratingB = Number(b.provider?.rating) || 0;
-      const reviewsA = Number(a.provider?.reviews) || 0;
-      const reviewsB = Number(b.provider?.reviews) || 0;
-      if (ratingB !== ratingA) return ratingB - ratingA;
-      return reviewsB - reviewsA;
-    });
+    let validListings = listings.map(toPublicListingDto).filter(Boolean);
+
+    const userLat = (lat !== undefined && lat !== null && lat !== '') ? Number(lat) : null;
+    const userLng = (lng !== undefined && lng !== null && lng !== '') ? Number(lng) : null;
+
+    if (userLat !== null && userLng !== null && !isNaN(userLat) && !isNaN(userLng)) {
+      validListings.forEach((item) => {
+        const itemLat = item.lat ?? item.latitude ?? item.provider?.lat ?? null;
+        const itemLng = item.lng ?? item.longitude ?? item.provider?.lng ?? null;
+        if (itemLat !== null && itemLng !== null && !isNaN(itemLat) && !isNaN(itemLng)) {
+          const R = 6371; // Earth radius in km
+          const dLat = (itemLat - userLat) * Math.PI / 180;
+          const dLon = (itemLng - userLng) * Math.PI / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(userLat * Math.PI / 180) * Math.cos(itemLat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distKm = Math.round(R * c * 10) / 10;
+          item.distanceKm = distKm;
+          item.distance = distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`;
+        } else {
+          item.distanceKm = 9999;
+          item.distance = 'Nearby';
+        }
+      });
+
+      // Filter by radius if provided
+      let sortedListings = validListings;
+      if (radiusKm && !isNaN(Number(radiusKm))) {
+        const maxR = Number(radiusKm);
+        sortedListings = sortedListings.filter((item) => (item.distanceKm || 0) <= maxR);
+      }
+
+      // Sort by distance (closest first!)
+      sortedListings.sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+      validListings = sortedListings;
+    } else {
+      validListings.sort((a, b) => {
+        const ratingA = Number(a.provider?.rating) || 0;
+        const ratingB = Number(b.provider?.rating) || 0;
+        const reviewsA = Number(a.provider?.reviews) || 0;
+        const reviewsB = Number(b.provider?.reviews) || 0;
+        if (ratingB !== ratingA) return ratingB - ratingA;
+        return reviewsB - reviewsA;
+      });
+    }
 
     res.status(200).json({
       success: true,

@@ -17,8 +17,12 @@ const categoryPins = {
 
 const filterCategories = ['All', 'Clothing', 'Restaurants', 'Services', 'Beauty & Care', 'Electronics'];
 
+import { useCity } from '../../../../context/CityContext';
+import { sortShopsByProximity } from '../../../../utils/distance';
+
 const NearbyMap = () => {
   const navigate = useNavigate();
+  const { currentCity, userLocation } = useCity();
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -28,19 +32,24 @@ const NearbyMap = () => {
   const [searchArea, setSearchArea] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState(null);
 
-  // User coordinate (Indore center)
-  const userLocation = { lat: 22.7196, lng: 75.8577 };
-
   // Fetch businesses
   useEffect(() => {
-    publicCatalogService.getProviderListings({ limit: 50 }).then((res) => {
+    const params = { limit: 50 };
+    if (currentCity?.name) params.city = currentCity.name;
+    if (userLocation?.lat && userLocation?.lng) {
+      params.lat = userLocation.lat;
+      params.lng = userLocation.lng;
+    }
+
+    publicCatalogService.getProviderListings(params).then((res) => {
       const items = res.listings || [];
-      setListings(items);
-      if (items.length > 0) {
-        setSelectedBusiness(items[0]);
+      const sorted = sortShopsByProximity(items, userLocation);
+      setListings(sorted);
+      if (sorted.length > 0) {
+        setSelectedBusiness(sorted[0]);
       }
     }).catch(console.error);
-  }, []);
+  }, [currentCity?.name, userLocation?.lat, userLocation?.lng]);
 
   // Filter businesses
   const filteredBusinesses = useMemo(() => {
@@ -113,9 +122,11 @@ const NearbyMap = () => {
 
     // Add marker for each business
     filteredBusinesses.forEach((biz, index) => {
-      // Determine lat/lng with fallbacks offset slightly around Indore
-      const lat = biz.location?.coordinates?.[1] || biz.latitude || (userLocation.lat + (Math.sin(index + 1) * 0.015));
-      const lng = biz.location?.coordinates?.[0] || biz.longitude || (userLocation.lng + (Math.cos(index + 1) * 0.018));
+      // Determine lat/lng with fallbacks offset slightly around user location
+      const uLat = userLocation?.lat || 22.7196;
+      const uLng = userLocation?.lng || 75.8577;
+      const lat = biz.lat || biz.latitude || biz.location?.coordinates?.[1] || (uLat + (Math.sin(index + 1) * 0.015));
+      const lng = biz.lng || biz.longitude || biz.location?.coordinates?.[0] || (uLng + (Math.cos(index + 1) * 0.018));
 
       const catSlug = (biz.categoryName || biz.category?.name || 'shops').toLowerCase();
       let pinStyle = categoryPins.shops;
@@ -243,7 +254,7 @@ const NearbyMap = () => {
                 <p className="text-xs text-[#718096] truncate">
                   {(selectedBusiness.categoryName ||
                     (typeof selectedBusiness.category === 'object' ? (selectedBusiness.category?.title || selectedBusiness.category?.name) : selectedBusiness.category) ||
-                    'Local Marketplace')} • {selectedBusiness.distance || '1.2 km'}
+                    'Local Marketplace')} • {selectedBusiness.distance || (selectedBusiness.distanceKm ? `${selectedBusiness.distanceKm.toFixed(1)} km` : 'Nearby')}
                 </p>
                 <div className="flex items-center gap-1 text-xs">
                   <FaStar className="w-3 h-3 text-[#F59E0B] fill-[#F59E0B]" />

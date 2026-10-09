@@ -177,6 +177,14 @@ const approveVendor = async (req, res) => {
     vendor.approvalDate = new Date();
     await vendor.save();
 
+    // Auto-sync service listings for newly approved vendor
+    try {
+      const { syncApprovedVendorListings } = require('../../utils/vendorListingSync');
+      await syncApprovedVendorListings();
+    } catch (e) {
+      console.warn('Sync vendor listing error:', e?.message);
+    }
+
     await logAudit({
       actorId: req.user ? req.user.id : vendor._id,
       actorType: 'ADMIN',

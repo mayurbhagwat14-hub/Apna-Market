@@ -74,10 +74,26 @@ const toPublicListingDto = (listing) => {
   const displayPrice = itemPrices.length ? Math.min(...itemPrices) : listingDisplayPrice(live.pricing);
   const approvedShopPhotos = (vendor?.shopPhotos || []).filter(isApprovedMarketingItem);
   const approvedOffers = (vendor?.offers || []).filter(isApprovedMarketingItem);
+  const activeApprovedOffer = approvedOffers.find((o) => o.isActive);
+  const realCoverImage = approvedShopPhotos[0]?.url || activeApprovedOffer?.imageUrl || live.dynamicFormAnswers?.coverImage || live.portfolioPhotos?.[0] || '';
 
   return {
     id: live._id.toString(),
     title: live.title,
+    businessName: vendor?.businessName || vendor?.name || live.title,
+    categoryName: category?.title || live.categoryName,
+    coverImage: realCoverImage,
+    image: realCoverImage,
+    rating: live.dynamicFormAnswers?.rating || vendor?.rating || 4.8,
+    reviewCount: live.dynamicFormAnswers?.reviewCount || vendor?.totalReviews || 0,
+    distance: live.dynamicFormAnswers?.distance || null,
+    lat: (vendor?.address?.lat !== undefined && vendor?.address?.lat !== null) ? Number(vendor.address.lat) : ((live.dynamicFormAnswers?.lat !== undefined && live.dynamicFormAnswers?.lat !== null) ? Number(live.dynamicFormAnswers.lat) : null),
+    lng: (vendor?.address?.lng !== undefined && vendor?.address?.lng !== null) ? Number(vendor.address.lng) : ((live.dynamicFormAnswers?.lng !== undefined && live.dynamicFormAnswers?.lng !== null) ? Number(live.dynamicFormAnswers.lng) : null),
+    latitude: (vendor?.address?.lat !== undefined && vendor?.address?.lat !== null) ? Number(vendor.address.lat) : ((live.dynamicFormAnswers?.lat !== undefined && live.dynamicFormAnswers?.lat !== null) ? Number(live.dynamicFormAnswers.lat) : null),
+    longitude: (vendor?.address?.lng !== undefined && vendor?.address?.lng !== null) ? Number(vendor.address.lng) : ((live.dynamicFormAnswers?.lng !== undefined && live.dynamicFormAnswers?.lng !== null) ? Number(live.dynamicFormAnswers.lng) : null),
+    city: vendor?.address?.city || live.serviceArea?.city || '',
+    fullAddress: vendor?.address?.fullAddress || vendor?.address?.addressLine1 || live.dynamicFormAnswers?.address || '',
+    address: vendor?.address || {},
     description: live.description,
     shortDescription: live.shortDescription || '',
     experience: live.experience || 0,
@@ -102,8 +118,9 @@ const toPublicListingDto = (listing) => {
       ...buildHighlights(live.bookingRulesFormAnswers || {}, category?.bookingRulesFormSchema || [])
     ],
     portfolioPhotos: Array.from(new Set([
-      ...(live.portfolioPhotos || []),
-      ...(approvedShopPhotos.map(p => p.url).filter(Boolean))
+      ...(approvedShopPhotos.map(p => p.url).filter(Boolean)),
+      ...(activeApprovedOffer?.imageUrl ? [activeApprovedOffer.imageUrl] : []),
+      ...(live.portfolioPhotos || [])
     ])),
     portfolioVideos: live.portfolioVideos || [],
     offer: (() => {
@@ -148,7 +165,10 @@ const toPublicListingDto = (listing) => {
       rating: vendor.rating || 4.8,
       reviews: vendor.totalReviews || 0,
       completedJobs: vendor.completedJobs || 0,
-      city: vendor.address?.city
+      city: vendor.address?.city || '',
+      address: vendor.address || {},
+      lat: vendor.address?.lat ?? null,
+      lng: vendor.address?.lng ?? null
     }
   };
 };

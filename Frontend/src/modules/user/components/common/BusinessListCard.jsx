@@ -18,13 +18,16 @@ const BusinessListCard = ({ business, className = '' }) => {
     'Local Shop';
   const rating = business.dynamicFormAnswers?.rating || business.rating || 4.6;
   const reviewCount = business.dynamicFormAnswers?.reviewCount || business.reviewCount || 150;
-  const distance = business.dynamicFormAnswers?.distance || business.distance || '1.5 km';
+  const distance = business.distance || 
+    (business.distanceKm !== undefined && business.distanceKm !== null && business.distanceKm !== 9999
+      ? (business.distanceKm < 1 ? `${Math.round(business.distanceKm * 1000)} m` : `${business.distanceKm.toFixed(1)} km`)
+      : (business.dynamicFormAnswers?.distance || 'Nearby'));
   const offer = business.dynamicFormAnswers?.offer || business.offer || null;
 
-  const image = business.dynamicFormAnswers?.coverImage ||
-    business.portfolioPhotos?.[0] ||
-    business.coverImage ||
+  const image = business.coverImage ||
     business.image ||
+    business.portfolioPhotos?.[0] ||
+    business.dynamicFormAnswers?.coverImage ||
     'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop&q=80';
 
   const saved = isSaved(business);

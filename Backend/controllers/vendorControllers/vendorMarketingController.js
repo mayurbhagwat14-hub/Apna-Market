@@ -8,34 +8,50 @@ const syncApprovedMarketingToListing = async (vendorId, vendor = null) => {
   const sourceVendor = vendor || await Vendor.findById(vendorId);
   if (!sourceVendor) return;
 
-  const primaryListing = await ServiceListing.findOne({ vendorId });
-  if (!primaryListing) return;
+  const listings = await ServiceListing.find({ vendorId });
+  if (!listings.length) return;
 
   const approvedPhotos = (sourceVendor.shopPhotos || [])
     .filter(isApprovedMarketingItem)
     .map((photo) => photo.url)
     .filter(Boolean);
 
-  primaryListing.portfolioPhotos = Array.from(new Set([
-    ...(primaryListing.portfolioPhotos || []).filter((url) => !url.includes('/vendors/shop-photos/')),
-    ...approvedPhotos
-  ]));
-
-  primaryListing.dynamicFormAnswers = primaryListing.dynamicFormAnswers || {};
   const activeOffer = (sourceVendor.offers || []).find((offer) => isApprovedMarketingItem(offer) && offer.isActive);
-  if (activeOffer) {
-    primaryListing.dynamicFormAnswers.offer = {
-      title: activeOffer.title,
-      badge: activeOffer.discountBadge,
-      code: activeOffer.code,
-      image: activeOffer.imageUrl,
-      discountPercent: activeOffer.discountPercent
-    };
-  } else {
-    delete primaryListing.dynamicFormAnswers.offer;
-  }
+  const realCoverImage = approvedPhotos[0] || activeOffer?.imageUrl;
 
-  await primaryListing.save();
+  for (const listing of listings) {
+    listing.portfolioPhotos = Array.from(new Set([
+      ...approvedPhotos,
+      ...(activeOffer?.imageUrl ? [activeOffer.imageUrl] : []),
+      ...(listing.portfolioPhotos || []).filter((url) => !url.includes('/vendors/shop-photos/'))
+    ]));
+
+    listing.dynamicFormAnswers = listing.dynamicFormAnswers || {};
+    if (realCoverImage) {
+      listing.dynamicFormAnswers.coverImage = realCoverImage;
+    }
+
+    if (activeOffer) {
+      listing.dynamicFormAnswers.offer = {
+        id: activeOffer._id?.toString?.() || activeOffer.id,
+        title: activeOffer.title,
+        tagline: activeOffer.tagline || '',
+        badge: activeOffer.discountBadge || `${activeOffer.discountPercent || 20}% OFF`,
+        discountBadge: activeOffer.discountBadge || `${activeOffer.discountPercent || 20}% OFF`,
+        code: activeOffer.code || 'APNA20',
+        image: activeOffer.imageUrl,
+        imageUrl: activeOffer.imageUrl,
+        discountPercent: activeOffer.discountPercent || 0,
+        discountAmount: activeOffer.discountAmount || 0,
+        validTill: activeOffer.validTill,
+        terms: activeOffer.terms || ''
+      };
+    } else {
+      delete listing.dynamicFormAnswers.offer;
+    }
+
+    await listing.save();
+  }
 };
 
 /**

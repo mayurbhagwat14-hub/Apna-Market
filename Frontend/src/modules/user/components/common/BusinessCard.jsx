@@ -18,14 +18,17 @@ const BusinessCard = ({ business, className = '', imageAspect = 'aspect-[4/3]' }
     'Retail';
   const rating = business.dynamicFormAnswers?.rating || business.rating || 4.5;
   const reviewCount = business.dynamicFormAnswers?.reviewCount || business.reviewCount || 120;
-  const distance = business.dynamicFormAnswers?.distance || business.distance || '1.2 km';
+  const distance = business.distance || 
+    (business.distanceKm !== undefined && business.distanceKm !== null && business.distanceKm !== 9999
+      ? (business.distanceKm < 1 ? `${Math.round(business.distanceKm * 1000)} m` : `${business.distanceKm.toFixed(1)} km`)
+      : (business.dynamicFormAnswers?.distance || 'Nearby'));
   const openStatus = business.dynamicFormAnswers?.openStatus || business.openStatus || 'Open Now';
   const offer = business.dynamicFormAnswers?.offer || business.offer || null;
 
-  const image = business.dynamicFormAnswers?.coverImage ||
-    business.portfolioPhotos?.[0] ||
-    business.coverImage ||
+  const image = business.coverImage ||
     business.image ||
+    business.portfolioPhotos?.[0] ||
+    business.dynamicFormAnswers?.coverImage ||
     'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&auto=format&fit=crop&q=80';
 
   const saved = isSaved(business);

@@ -12,20 +12,38 @@ import {
   FiGrid,
   FiMapPin,
   FiCompass,
-  FiStar
+  FiStar,
+  FiX,
+  FiChevronRight
 } from 'react-icons/fi';
 import TopHeader from '../../components/common/TopHeader';
 import BusinessCard from '../../components/common/BusinessCard';
 import HeroBannerCarousel from './components/HeroBannerCarousel';
 import { publicCatalogService } from '../../../../services/catalogService';
+import { useCity } from '../../../../context/CityContext';
+import { sortShopsByProximity } from '../../../../utils/distance';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { currentCity, userLocation } = useCity();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchContainerRef = React.useRef(null);
   const [categories, setCategories] = useState([]);
   const [businesses, setBusinesses] = useState([]);
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Close search suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +69,20 @@ const Home = () => {
           console.warn('Could not load dynamic home banners, using defaults:', bannerErr);
         }
 
-        // Fetch business listings
-        const listRes = await publicCatalogService.getProviderListings({ limit: 20 });
+        // Fetch business listings with user address / city & coordinates
+        const queryParams = { limit: 50 };
+        if (currentCity?.name) {
+          queryParams.city = currentCity.name;
+        }
+        if (userLocation?.lat && userLocation?.lng) {
+          queryParams.lat = userLocation.lat;
+          queryParams.lng = userLocation.lng;
+        }
+
+        const listRes = await publicCatalogService.getProviderListings(queryParams);
         if (!cancelled && listRes?.success && listRes.listings?.length > 0) {
-          setBusinesses(listRes.listings);
+          const sorted = sortShopsByProximity(listRes.listings, userLocation);
+          setBusinesses(sorted);
         }
       } catch (err) {
         console.error('Error fetching home discovery data:', err);
@@ -65,7 +93,7 @@ const Home = () => {
 
     fetchData();
     return () => { cancelled = true; };
-  }, []);
+  }, [currentCity?.name, userLocation?.lat, userLocation?.lng]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -244,8 +272,29 @@ const Home = () => {
   ];
 
   const allListings = businesses.length > 0 ? businesses : showcaseDefaults;
-  const popularBusinesses = allListings.slice(0, 5);
-  const recommendedBusinesses = allListings.slice(1, 5);
+  const popularBusinesses = allListings.slice(0, 6);
+  const recommendedBusinesses = allListings.slice(0, 12);
+
+  const searchSuggestions = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return { matchingShops: [], matchingCats: [] };
+
+    const matchingShops = allListings.filter((item) => {
+      const title = (item.title || '').toLowerCase();
+      const bizName = (item.businessName || item.provider?.businessName || item.provider?.name || '').toLowerCase();
+      const cat = (item.categoryName || item.category?.title || '').toLowerCase();
+      const shopName = (item.dynamicFormAnswers?.shopName || '').toLowerCase();
+      const vendorName = (item.dynamicFormAnswers?.vendorName || '').toLowerCase();
+      return title.includes(q) || bizName.includes(q) || cat.includes(q) || shopName.includes(q) || vendorName.includes(q);
+    }).slice(0, 4);
+
+    const matchingCats = displayCategories.filter((c) => {
+      if (c.isMore) return false;
+      return c.title.toLowerCase().includes(q) || c.subtitle?.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q);
+    }).slice(0, 3);
+
+    return { matchingShops, matchingCats };
+  }, [searchQuery, allListings, displayCategories]);
 
   return (
     <div className="min-h-screen bg-[#FBFBFA] pb-28 font-sans w-full relative select-none overflow-x-hidden">
@@ -265,27 +314,144 @@ const Home = () => {
       {/* 2. Main Discovery Area */}
       <main className="w-full max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-6 space-y-5 sm:space-y-7 relative z-10">
         
-        {/* Search Bar */}
-        <form onSubmit={handleSearchSubmit} className="relative flex items-center">
-          <div className="relative w-full">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 w-4.5 h-4.5 sm:w-5 sm:h-5" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search shops, restaurants, services..."
-              className="w-full pl-11 pr-11 py-3 sm:py-3.5 bg-white rounded-full border border-neutral-200/90 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54] transition-all"
-            />
-            <button
-              type="button"
-              onClick={() => navigate('/user/explore')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-neutral-400 hover:text-[#016A54] transition-colors cursor-pointer"
-              aria-label="Filter"
-            >
-              <FiSliders className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-            </button>
-          </div>
-        </form>
+        {/* Search Bar with Instant Suggestions */}
+        <div ref={searchContainerRef} className="relative z-30">
+          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+            <div className="relative w-full">
+              <button
+                type="submit"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-[#016A54] transition-colors p-1 cursor-pointer"
+                aria-label="Search"
+              >
+                <FiSearch className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+              </button>
+              <input
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsSearchOpen(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchOpen(true);
+                }}
+                placeholder="Search shops, restaurants, services..."
+                className="w-full pl-11 pr-20 py-3 sm:py-3.5 bg-white rounded-full border border-neutral-200/90 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54] transition-all"
+              />
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                    className="p-1 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
+                    aria-label="Clear"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/user/explore')}
+                  className="p-1.5 text-neutral-400 hover:text-[#016A54] transition-colors cursor-pointer"
+                  aria-label="Filter"
+                  title="Explore all"
+                >
+                  <FiSliders className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {/* Instant Dropdown Suggestions */}
+          {isSearchOpen && searchQuery.trim().length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-neutral-150 shadow-xl z-50 overflow-hidden divide-y divide-neutral-100 max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150">
+              {/* Category Suggestions */}
+              {searchSuggestions.matchingCats.length > 0 && (
+                <div className="p-2.5 bg-neutral-50/70">
+                  <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider px-2 mb-1.5">
+                    Categories
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 px-1">
+                    {searchSuggestions.matchingCats.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setIsSearchOpen(false);
+                          navigate(`/user/category/${cat.slug}`);
+                        }}
+                        className="px-3 py-1.5 rounded-full bg-white border border-neutral-200 text-xs font-semibold text-neutral-800 hover:border-[#016A54] hover:text-[#016A54] transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>{cat.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Matching Shop Results */}
+              {searchSuggestions.matchingShops.length > 0 ? (
+                <div className="p-1">
+                  <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider px-3 pt-2 pb-1">
+                    Stores & Businesses
+                  </div>
+                  {searchSuggestions.matchingShops.map((shop) => {
+                    const shopId = shop._id || shop.id;
+                    const shopName = shop.title || shop.businessName || shop.provider?.businessName || shop.provider?.name || 'Local Shop';
+                    const shopCat = shop.categoryName || shop.category?.title || 'Shop';
+                    const shopImg = shop.coverImage || shop.image || shop.portfolioPhotos?.[0] || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=200&auto=format&fit=crop&q=80';
+                    return (
+                      <button
+                        key={shopId}
+                        type="button"
+                        onClick={() => {
+                          setIsSearchOpen(false);
+                          navigate(`/user/listings/${shopId}`);
+                        }}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-neutral-50 transition-colors flex items-center justify-between group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={shopImg}
+                            alt={shopName}
+                            className="w-10 h-10 rounded-lg object-cover bg-neutral-100 shrink-0 border border-neutral-100"
+                          />
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-[#016A54] transition-colors line-clamp-1">
+                              {shopName}
+                            </div>
+                            <div className="text-[11px] text-neutral-500 font-medium">
+                              {shopCat}
+                            </div>
+                          </div>
+                        </div>
+                        <FiChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-[#016A54] transition-transform group-hover:translate-x-0.5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-neutral-500 font-medium">
+                  No instant matches found in current list
+                </div>
+              )}
+
+              {/* View all in explore footer */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  navigate(`/user/explore?q=${encodeURIComponent(searchQuery.trim())}`);
+                }}
+                className="w-full p-3 text-center text-xs font-bold text-[#016A54] hover:bg-[#EDF8F5] transition-colors flex items-center justify-center gap-1.5 cursor-pointer bg-white"
+              >
+                <span>Search all results for "{searchQuery}"</span>
+                <FiArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* 3. "Discover Near You" Dynamic Hero Feature Banner Carousel */}
         <HeroBannerCarousel banners={banners} />
