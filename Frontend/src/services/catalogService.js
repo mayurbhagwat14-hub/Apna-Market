@@ -380,6 +380,9 @@ export const publicCatalogService = {
     if (params.categoryId) queryParams.append('categoryId', params.categoryId);
     if (params.categorySlug) queryParams.append('categorySlug', params.categorySlug);
     if (params.city) queryParams.append('city', params.city);
+    if (params.lat !== undefined && params.lat !== null && params.lat !== '') queryParams.append('lat', params.lat);
+    if (params.lng !== undefined && params.lng !== null && params.lng !== '') queryParams.append('lng', params.lng);
+    if (params.radiusKm) queryParams.append('radiusKm', params.radiusKm);
     if (params.search) queryParams.append('search', params.search);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);

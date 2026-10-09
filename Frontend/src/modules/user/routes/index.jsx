@@ -110,12 +110,18 @@ const UserRoutes = () => {
     '/user/',
     '/user/explore',
     '/user/map',
+    '/user/nearby',
     '/user/saved',
+    '/user/favorites',
     '/user/account',
+    '/user/profile',
     '/user/my-bookings',
     '/user/cart',
+    '/user/all-services',
   ];
-  const shouldShowBottomNav = bottomNavPages.includes(location.pathname);
+  const shouldShowBottomNav =
+    bottomNavPages.includes(location.pathname) ||
+    location.pathname.startsWith('/user/category');
 
   // Check if we hide the live booking card (e.g. if we are on the specific booking details or track page)
   const isBookingDetailsPage = location.pathname.match(/^\/user\/booking\/[a-zA-Z0-9]+(\/track)?$/);

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { FiGrid, FiPlus, FiTrash2, FiSave, FiEdit2 } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiGrid, FiPlus, FiTrash2, FiSave, FiEdit2, FiArrowUp, FiArrowDown, FiExternalLink, FiMapPin, FiLayers } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import CardShell from "../components/CardShell";
 import Modal from "../components/Modal";
@@ -208,24 +209,33 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
 
 
 
-  const updateCategory = (id, patch) => {
+  const navigate = useNavigate();
+
+  const updateCategory = async (id, patch) => {
     const next = ensureIds(catalog);
-    next.categories = next.categories.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    next.categories = (next.categories || []).map((c) => (c.id === id ? { ...c, ...patch } : c));
     setCatalog(next);
     saveCatalog(next);
+    try {
+      await categoryService.update(id, patch);
+      toast.success("Category updated");
+    } catch (e) {
+      console.warn("Failed to persist category update:", e);
+    }
   };
 
-  const moveCategory = (id, dir) => {
+  const moveCategory = async (id, dir) => {
     const next = ensureIds(catalog);
-    const list = [...next.categories].sort((a, b) => (a.homeOrder || 0) - (b.homeOrder || 0));
+    const list = [...(next.categories || [])].sort((a, b) => (a.homeOrder || 0) - (b.homeOrder || 0));
     const idx = list.findIndex((c) => c.id === id);
     if (idx < 0) return;
     const targetIdx = dir === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= list.length) return;
     const a = list[idx];
     const b = list[targetIdx];
-    const aOrder = a.homeOrder || 0;
-    const bOrder = b.homeOrder || 0;
+    const aOrder = a.homeOrder !== undefined ? a.homeOrder : idx;
+    const bOrder = b.homeOrder !== undefined ? b.homeOrder : targetIdx;
+
     next.categories = next.categories.map((c) => {
       if (c.id === a.id) return { ...c, homeOrder: bOrder };
       if (c.id === b.id) return { ...c, homeOrder: aOrder };
@@ -233,6 +243,15 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
     });
     setCatalog(next);
     saveCatalog(next);
+    try {
+      await Promise.all([
+        categoryService.updateOrder(a.id, bOrder).catch(() => {}),
+        categoryService.updateOrder(b.id, aOrder).catch(() => {})
+      ]);
+      toast.success("Category order updated");
+    } catch (e) {
+      console.warn("Failed to update order:", e);
+    }
   };
 
   const syncHomeToBackend = async (homeData) => {
@@ -458,6 +477,192 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
 
   return (
     <div className="space-y-4">
+      {/* 1. Location-Based Catalog Notice */}
+      <div className="bg-gradient-to-r from-emerald-950 via-[#014A3B] to-[#016A54] rounded-2xl p-5 text-white shadow-md border border-emerald-600/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 text-xs font-black uppercase tracking-wider border border-emerald-400/30 flex items-center gap-1">
+              <FiMapPin className="w-3 h-3 text-emerald-300" />
+              <span>Location-Based Auto Discovery</span>
+            </span>
+          </div>
+          <h2 className="text-base sm:text-lg font-bold text-white">
+            Customer Home Page Listings are Automatic & Ranked by Location
+          </h2>
+          <p className="text-xs sm:text-sm text-emerald-100/90 max-w-3xl leading-relaxed">
+            All stores, shops, and services below the top grid on the Customer Home are automatically fetched from registered vendors and sorted strictly by real-time GPS distance and selected city. You only need to adjust the <strong>Top Categories</strong> and <strong>Home Banners</strong> below.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/user-categories/categories')}
+          className="px-4 py-2 rounded-xl bg-white text-[#014A3B] font-bold text-xs hover:bg-emerald-50 active:scale-95 transition-all shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer"
+        >
+          <span>All Categories</span>
+          <FiExternalLink className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* 2. Top Categories on Customer Home */}
+      <CardShell icon={FiLayers}>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
+            <div>
+              <div className="text-lg font-bold text-gray-900 flex items-center gap-2.5">
+                <div className="w-1.5 h-6 bg-gradient-to-b from-[#016A54] to-emerald-600 rounded-full"></div>
+                <span>Top Categories on Home Screen</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                These categories appear in the customer home screen's top grid (first 5 active categories + automatic "More" card).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {categories.filter(c => c.showOnHome !== false).length} Visible on Home
+              </span>
+            </div>
+          </div>
+
+          {categories.length === 0 ? (
+            <div className="p-6 text-center text-sm text-gray-500">
+              No categories found. Create categories first in the Categories tab.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b-2 border-gray-200 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <th className="py-2.5 px-3 w-16 text-center">Order</th>
+                    <th className="py-2.5 px-3 w-20">Icon</th>
+                    <th className="py-2.5 px-3">Category Title</th>
+                    <th className="py-2.5 px-3">Slug</th>
+                    <th className="py-2.5 px-3 text-center">Home Status</th>
+                    <th className="py-2.5 px-3 text-center w-28">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {categories.map((cat, idx) => {
+                    const isVisible = cat.showOnHome !== false;
+                    const isTopFive = isVisible && idx < 5;
+                    return (
+                      <tr 
+                        key={cat.id || idx} 
+                        className={`hover:bg-gray-50/80 transition-colors ${
+                          !isVisible ? 'opacity-60 bg-gray-50/40' : ''
+                        }`}
+                      >
+                        {/* Order & Move buttons */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-xs font-bold text-gray-500 w-4">
+                              {idx + 1}
+                            </span>
+                            <div className="flex flex-col">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => moveCategory(cat.id, 'up')}
+                                className="p-0.5 text-gray-400 hover:text-emerald-700 disabled:opacity-20 cursor-pointer"
+                                title="Move Up"
+                              >
+                                <FiArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === categories.length - 1}
+                                onClick={() => moveCategory(cat.id, 'down')}
+                                className="p-0.5 text-gray-400 hover:text-emerald-700 disabled:opacity-20 cursor-pointer"
+                                title="Move Down"
+                              >
+                                <FiArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Visual / Icon */}
+                        <td className="py-2.5 px-3">
+                          {cat.homeIconUrl || cat.imageUrl || cat.icon ? (
+                            <img
+                              src={cat.homeIconUrl || cat.imageUrl || cat.icon}
+                              alt={cat.title}
+                              className="w-10 h-10 object-cover rounded-xl border border-gray-200 shadow-2xs bg-white"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-400">
+                              {cat.title?.[0] || "?"}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Title & Badge */}
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-900">
+                              {cat.title}
+                            </span>
+                            {isTopFive && (
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                Top Grid
+                              </span>
+                            )}
+                            {cat.homeBadge && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                                {cat.homeBadge}
+                              </span>
+                            )}
+                          </div>
+                          {cat.subtitle && (
+                            <div className="text-xs text-gray-400 truncate mt-0.5">
+                              {cat.subtitle}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Slug */}
+                        <td className="py-2.5 px-3 text-xs font-mono text-gray-500">
+                          {cat.slug || "—"}
+                        </td>
+
+                        {/* Visibility Toggle */}
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => updateCategory(cat.id, { showOnHome: !isVisible })}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                              isVisible
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
+                          >
+                            {isVisible ? 'Visible on Home' : 'Hidden'}
+                          </button>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => navigate('/admin/user-categories/categories')}
+                            className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center gap-1 text-xs font-semibold cursor-pointer"
+                            title="Edit Category Details"
+                          >
+                            <FiEdit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </CardShell>
+
+      {/* 3. Home Banners Card */}
       <CardShell icon={FiGrid}>
         <div className="space-y-4">
           <div>

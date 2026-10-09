@@ -29,10 +29,18 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = React.useRef(null);
+  const sentinelRef = React.useRef(null);
+
   const [categories, setCategories] = useState([]);
   const [businesses, setBusinesses] = useState([]);
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Pagination & continuous scroll state
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   // Close search suggestions on click outside
   useEffect(() => {
@@ -45,32 +53,34 @@ const Home = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Initial load on city or location change
   useEffect(() => {
     let cancelled = false;
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch categories
-        const catRes = await publicCatalogService.getCategories();
-        if (!cancelled && catRes?.success && catRes.categories?.length > 0) {
-          setCategories(catRes.categories);
+        setPage(1);
+        setHasMore(true);
+
+        // Fetch categories & home banners concurrently
+        const [catRes, contentRes] = await Promise.allSettled([
+          publicCatalogService.getCategories(),
+          publicCatalogService.getHomeContent()
+        ]);
+
+        if (!cancelled && catRes.status === 'fulfilled' && catRes.value?.success && catRes.value.categories?.length > 0) {
+          setCategories(catRes.value.categories);
         }
 
-        // Fetch home banners
-        try {
-          const contentRes = await publicCatalogService.getHomeContent();
-          if (!cancelled && contentRes?.success && contentRes.homeContent?.banners?.length > 0) {
-            const activeList = contentRes.homeContent.banners.filter(b => b.isActive !== false);
-            if (activeList.length > 0) {
-              setBanners(activeList);
-            }
+        if (!cancelled && contentRes.status === 'fulfilled' && contentRes.value?.success && contentRes.value.homeContent?.banners?.length > 0) {
+          const activeList = contentRes.value.homeContent.banners.filter(b => b.isActive !== false);
+          if (activeList.length > 0) {
+            setBanners(activeList);
           }
-        } catch (bannerErr) {
-          console.warn('Could not load dynamic home banners, using defaults:', bannerErr);
         }
 
-        // Fetch business listings with user address / city & coordinates
-        const queryParams = { limit: 50 };
+        // Fetch initial business listings (page 1, limit 24)
+        const queryParams = { page: 1, limit: 24 };
         if (currentCity?.name) {
           queryParams.city = currentCity.name;
         }
@@ -80,9 +90,13 @@ const Home = () => {
         }
 
         const listRes = await publicCatalogService.getProviderListings(queryParams);
-        if (!cancelled && listRes?.success && listRes.listings?.length > 0) {
-          const sorted = sortShopsByProximity(listRes.listings, userLocation);
+        if (!cancelled && listRes?.success) {
+          const fetched = listRes.listings || [];
+          const sorted = sortShopsByProximity(fetched, userLocation);
           setBusinesses(sorted);
+
+          const totalPages = listRes.pagination?.pages || Math.ceil((listRes.pagination?.total || fetched.length) / 24);
+          setHasMore(totalPages > 1 && fetched.length >= 24);
         }
       } catch (err) {
         console.error('Error fetching home discovery data:', err);
@@ -94,6 +108,61 @@ const Home = () => {
     fetchData();
     return () => { cancelled = true; };
   }, [currentCity?.name, userLocation?.lat, userLocation?.lng]);
+
+  // Load next page of businesses for continuous scrolling
+  const loadMore = async () => {
+    if (isLoadingMore || !hasMore || loading) return;
+    try {
+      setIsLoadingMore(true);
+      const nextPage = page + 1;
+      const queryParams = { page: nextPage, limit: 24 };
+      if (currentCity?.name) queryParams.city = currentCity.name;
+      if (userLocation?.lat && userLocation?.lng) {
+        queryParams.lat = userLocation.lat;
+        queryParams.lng = userLocation.lng;
+      }
+
+      const listRes = await publicCatalogService.getProviderListings(queryParams);
+      if (listRes?.success && listRes.listings?.length > 0) {
+        const sorted = sortShopsByProximity(listRes.listings, userLocation);
+        setBusinesses((prev) => {
+          const seenIds = new Set(prev.map((b) => b._id || b.id));
+          const newUnique = sorted.filter((b) => !seenIds.has(b._id || b.id));
+          return [...prev, ...newUnique];
+        });
+        setPage(nextPage);
+
+        const totalPages = listRes.pagination?.pages || Math.ceil((listRes.pagination?.total || 0) / 24);
+        if (nextPage >= totalPages || listRes.listings.length < 24) {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Error loading more listings:', err);
+      setHasMore(false);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // IntersectionObserver sentinel: triggers loadMore when user scrolls near the bottom
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px' }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, loading, page, currentCity?.name, userLocation?.lat, userLocation?.lng]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -272,8 +341,34 @@ const Home = () => {
   ];
 
   const allListings = businesses.length > 0 ? businesses : showcaseDefaults;
-  const popularBusinesses = allListings.slice(0, 6);
-  const recommendedBusinesses = allListings.slice(0, 12);
+
+  // Closest stores near the user (< 3 km or closest 8 stores)
+  const nearestListings = useMemo(() => {
+    return [...allListings].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999)).slice(0, 8);
+  }, [allListings]);
+
+  // Top Rated in City (4.5★ and above)
+  const topRatedListings = useMemo(() => {
+    return [...allListings]
+      .filter((item) => Number(item.rating || item.dynamicFormAnswers?.rating || 0) >= 4.5)
+      .slice(0, 6);
+  }, [allListings]);
+
+  // Filtered listings for the main continuous stream ("scroll karta raho khtm na ho")
+  const filteredListings = useMemo(() => {
+    if (activeFilter === 'all') return allListings;
+    if (activeFilter === 'nearest') {
+      return [...allListings].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+    }
+    if (activeFilter === 'top-rated') {
+      return [...allListings].filter((item) => Number(item.rating || item.dynamicFormAnswers?.rating || 0) >= 4.5);
+    }
+    return allListings.filter((item) => {
+      const catSlug = (item.category?.slug || item.categorySlug || item.categoryName || '').toLowerCase();
+      const catId = item.categoryId || item.category?._id || item.category;
+      return catSlug.includes(activeFilter.toLowerCase()) || catId === activeFilter;
+    });
+  }, [allListings, activeFilter]);
 
   const searchSuggestions = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -511,79 +606,243 @@ const Home = () => {
           </div>
         </div>
 
-        {/* 5. Popular Shops Near You Section */}
-        <section className="pt-1">
-          <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
-            <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight">
-              Popular Shops Near You
-            </h2>
-            <button
-              type="button"
-              onClick={() => navigate('/user/explore')}
-              className="text-xs sm:text-sm font-bold text-[#016A54] hover:text-[#014A3B] flex items-center gap-0.5 cursor-pointer"
-            >
-              <span>See All</span>
-              <FiArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Horizontal snap scroll on mobile, responsive grid on tablet/desktop */}
-          <div className="flex sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
-            {popularBusinesses.map((item) => (
-              <div 
-                key={item._id || item.id} 
-                className="w-[165px] min-w-[165px] max-w-[165px] sm:w-auto sm:min-w-0 sm:max-w-none snap-start shrink-0 sm:shrink"
-              >
-                <BusinessCard business={item} imageAspect="aspect-square" />
+        {/* 5. Nearest Stores to You (Proximity Spotlight) */}
+        {nearestListings.length > 0 && (
+          <section className="pt-1">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
+              <div>
+                <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight flex items-center gap-1.5">
+                  <span>Nearest Stores to You</span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    Proximity
+                  </span>
+                </h2>
+                <p className="text-[11px] text-neutral-500 font-medium">
+                  Walking & quick drive distance from your current location
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
+              <button
+                type="button"
+                onClick={() => navigate('/user/map')}
+                className="text-xs sm:text-sm font-bold text-[#016A54] hover:text-[#014A3B] flex items-center gap-0.5 cursor-pointer shrink-0"
+              >
+                <span>View on Map</span>
+                <FiArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Horizontal snap scroll on mobile, responsive grid on tablet/desktop */}
+            <div className="flex sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+              {nearestListings.map((item) => (
+                <div 
+                  key={item._id || item.id} 
+                  className="w-[165px] min-w-[165px] max-w-[165px] sm:w-auto sm:min-w-0 sm:max-w-none snap-start shrink-0 sm:shrink"
+                >
+                  <BusinessCard business={item} imageAspect="aspect-square" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 6. Neighborhood Discovery Banner */}
         <section 
           onClick={() => navigate('/user/map')}
-          className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#EDF8F5] to-[#E6F3EE] border border-[#ADE2D7]/70 p-3.5 sm:p-5 flex items-center justify-between shadow-2xs cursor-pointer active:scale-[0.99] transition-all"
+          className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#EDF8F5] via-[#E2F4EE] to-[#EDF8F5] border border-[#ADE2D7]/70 p-4 sm:p-5 flex items-center justify-between shadow-2xs cursor-pointer active:scale-[0.99] transition-all hover:border-[#016A54]/40"
         >
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#016A54] text-white font-black text-sm sm:text-base flex items-center justify-center shrink-0 shadow-xs">
-              <FiMapPin className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#016A54] text-white font-black text-sm sm:text-base flex items-center justify-center shrink-0 shadow-md">
+              <FiMapPin className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
             </div>
             <div>
               <h3 className="text-xs sm:text-sm md:text-base font-black text-[#01352A]">
-                Explore Businesses on Map
+                Explore Local Businesses on Live Map
               </h3>
               <p className="text-[11px] sm:text-xs md:text-sm text-[#015B48] font-medium">
-                Find shops within walking or driving distance
+                Tap to find exact stores near {currentCity?.name || 'your area'} with real-time distance
               </p>
             </div>
           </div>
-          <span className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#016A54] text-white text-[11px] sm:text-xs font-bold shrink-0 shadow-xs">
+          <span className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#016A54] text-white text-[11px] sm:text-xs font-bold shrink-0 shadow-sm hover:bg-[#015B48] transition-colors">
             Open Map
           </span>
         </section>
 
-        {/* 7. Recommended Businesses Responsive Grid */}
-        <section className="pt-1">
-          <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
-            <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight">
-              Recommended Businesses
-            </h2>
+        {/* 7. Top Rated in Your Area */}
+        {topRatedListings.length > 0 && activeFilter === 'all' && (
+          <section className="pt-1">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
+              <div>
+                <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight flex items-center gap-1.5">
+                  <span>Top Rated in {currentCity?.name || 'Your Area'}</span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                    ★ 4.5+ Rated
+                  </span>
+                </h2>
+                <p className="text-[11px] text-neutral-500 font-medium">
+                  Highest customer ratings and reviews
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+              {topRatedListings.map((item) => (
+                <BusinessCard key={`top-${item._id || item.id}`} business={item} imageAspect="aspect-[4/3]" />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 8. Interactive Discovery Filter Chips Bar */}
+        <section className="pt-2 sticky top-[60px] z-20 bg-[#FBFBFA]/95 backdrop-blur-md py-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
             <button
               type="button"
-              onClick={() => navigate('/user/map')}
-              className="text-xs sm:text-sm font-bold text-[#016A54] hover:text-[#014A3B] flex items-center gap-0.5 cursor-pointer"
+              onClick={() => setActiveFilter('all')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                activeFilter === 'all'
+                  ? 'bg-[#016A54] text-white shadow-sm'
+                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+              }`}
             >
-              <span>On Map</span>
-              <FiArrowRight className="w-3.5 h-3.5" />
+              All Stores ({allListings.length})
             </button>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
-            {recommendedBusinesses.map((item) => (
-              <BusinessCard key={item._id || item.id} business={item} imageAspect="aspect-[4/3]" />
+            <button
+              type="button"
+              onClick={() => setActiveFilter('nearest')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                activeFilter === 'nearest'
+                  ? 'bg-[#016A54] text-white shadow-sm'
+                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+              }`}
+            >
+              <span>⚡ Nearest First</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveFilter('top-rated')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                activeFilter === 'top-rated'
+                  ? 'bg-[#016A54] text-white shadow-sm'
+                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+              }`}
+            >
+              <span>⭐ Top Rated</span>
+            </button>
+
+            {categories.filter(c => c.showOnHome !== false).map((cat) => (
+              <button
+                key={cat.id || cat._id}
+                type="button"
+                onClick={() => setActiveFilter(cat.slug || cat.id)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  activeFilter === (cat.slug || cat.id)
+                    ? 'bg-[#016A54] text-white shadow-sm'
+                    : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+                }`}
+              >
+                {cat.title}
+              </button>
             ))}
           </div>
+        </section>
+
+        {/* 9. The Continuous Infinite Marketplace Feed ("scroll karta raho khtm na ho") */}
+        <section className="pt-1 pb-6">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div>
+              <h2 className="text-[16px] sm:text-xl font-black text-[#102030] tracking-tight">
+                {activeFilter === 'all'
+                  ? `All Stores & Businesses in ${currentCity?.name || 'Your Area'}`
+                  : `Filtered Results (${filteredListings.length})`}
+              </h2>
+              <p className="text-[11px] sm:text-xs text-neutral-500 font-medium">
+                Live vendor listings ranked by proximity • Keep scrolling to discover more
+              </p>
+            </div>
+            <span className="text-xs font-extrabold text-[#016A54] px-2.5 py-1 rounded-full bg-[#EDF8F5]">
+              {filteredListings.length} {filteredListings.length === 1 ? 'store' : 'stores'}
+            </span>
+          </div>
+
+          {filteredListings.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
+              {filteredListings.map((item) => (
+                <BusinessCard 
+                  key={`feed-${item._id || item.id}`} 
+                  business={item} 
+                  imageAspect="aspect-[4/3]" 
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-neutral-150 p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-neutral-100 mx-auto flex items-center justify-center text-xl">
+                🔍
+              </div>
+              <h3 className="text-sm font-bold text-neutral-800">
+                No stores found matching this filter
+              </h3>
+              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                Try switching the filter back to "All Stores" or explore other categories.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('all')}
+                className="px-4 py-2 rounded-xl bg-[#016A54] text-white text-xs font-bold hover:bg-[#015B48] transition-colors cursor-pointer"
+              >
+                Show All Stores
+              </button>
+            </div>
+          )}
+
+          {/* Infinite Scroll Sentinel: triggers loadMore when scrolled into view */}
+          <div ref={sentinelRef} className="h-6 w-full pointer-events-none" />
+
+          {/* Loading More Pulse Indicator */}
+          {isLoadingMore && (
+            <div className="pt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5 animate-pulse">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="bg-white rounded-2xl border border-neutral-150 p-3 space-y-2.5">
+                  <div className="w-full aspect-[4/3] rounded-xl bg-neutral-200" />
+                  <div className="h-3.5 bg-neutral-200 rounded w-3/4" />
+                  <div className="h-3 bg-neutral-100 rounded w-1/2" />
+                  <div className="h-3 bg-neutral-100 rounded w-1/3" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* End of Feed Celebratory Banner */}
+          {!hasMore && filteredListings.length > 0 && !isLoadingMore && (
+            <div className="mt-8 p-5 bg-gradient-to-r from-[#EDF8F5] via-white to-[#EDF8F5] rounded-2xl border border-[#ADE2D7]/50 text-center space-y-2">
+              <span className="text-2xl">✨</span>
+              <h4 className="text-xs sm:text-sm font-black text-[#01352A]">
+                You've explored all {filteredListings.length} local businesses near you in {currentCity?.name || 'this area'}!
+              </h4>
+              <p className="text-[11px] text-[#016A54] font-medium">
+                New stores and services are added regularly by verified vendors.
+              </p>
+              <div className="pt-1 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/user/map')}
+                  className="px-3.5 py-1.5 rounded-full bg-[#016A54] text-white text-xs font-bold hover:bg-[#015B48] transition-colors cursor-pointer"
+                >
+                  View on Live Map
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  className="px-3.5 py-1.5 rounded-full bg-white border border-neutral-200 text-neutral-700 text-xs font-bold hover:bg-neutral-50 transition-colors cursor-pointer"
+                >
+                  Back to Top ↑
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
       </main>

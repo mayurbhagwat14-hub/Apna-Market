@@ -54,14 +54,14 @@ const BottomNav = React.memo(() => {
   const activeTab = getActiveTab();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 w-full sm:max-w-xl md:max-w-2xl mx-auto pointer-events-none pb-[env(safe-area-inset-bottom)] sm:pb-3 sm:px-4">
-      <div className="bg-white/95 backdrop-blur-xl border-t sm:border border-neutral-150/80 px-4 sm:px-6 py-1.5 sm:py-2 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] sm:shadow-[0_12px_36px_rgba(0,0,0,0.12)] flex items-center justify-around pointer-events-auto rounded-t-3xl sm:rounded-full transition-all">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 w-full bg-white/95 backdrop-blur-xl border-t border-neutral-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="w-full max-w-lg md:max-w-xl mx-auto px-2 sm:px-6 py-1.5 flex items-center justify-around">
         
         {/* 1. Home */}
         <button
           type="button"
           onClick={() => navigate('/user')}
-          className={`flex flex-col items-center justify-center w-14 h-12 transition-all active:scale-95 ${
+          className={`flex-1 flex flex-col items-center justify-center h-12 transition-all active:scale-95 cursor-pointer ${
             activeTab === 'home' ? 'text-[#016A54] font-extrabold' : 'text-neutral-400 hover:text-neutral-700'
           }`}
           aria-label="Home"
@@ -78,7 +78,7 @@ const BottomNav = React.memo(() => {
         <button
           type="button"
           onClick={() => navigate('/user/explore')}
-          className={`flex flex-col items-center justify-center w-14 h-12 transition-all active:scale-95 ${
+          className={`flex-1 flex flex-col items-center justify-center h-12 transition-all active:scale-95 cursor-pointer ${
             activeTab === 'explore' ? 'text-[#016A54] font-extrabold' : 'text-neutral-400 hover:text-neutral-700'
           }`}
           aria-label="Explore"
@@ -92,13 +92,13 @@ const BottomNav = React.memo(() => {
         </button>
 
         {/* 3. Center Raised Map / Nearby Action Button */}
-        <div className="relative -mt-6 flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center justify-center relative">
           <button
             type="button"
             onClick={() => navigate('/user/map')}
-            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90 ${
+            className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90 -mt-6 cursor-pointer ring-4 ring-white ${
               activeTab === 'map'
-                ? 'bg-[#014A3B] text-white ring-4 ring-[#EDF8F5] shadow-[#014A3B]/40'
+                ? 'bg-[#014A3B] text-white shadow-[#014A3B]/40'
                 : 'bg-[#016A54] text-white shadow-[#016A54]/30 hover:bg-[#015B48]'
             }`}
             aria-label="Nearby Map"
@@ -111,19 +111,21 @@ const BottomNav = React.memo(() => {
         <button
           type="button"
           onClick={() => navigate('/user/saved')}
-          className={`flex flex-col items-center justify-center w-14 h-12 relative transition-all active:scale-95 ${
+          className={`flex-1 flex flex-col items-center justify-center h-12 relative transition-all active:scale-95 cursor-pointer ${
             activeTab === 'saved' ? 'text-[#016A54] font-extrabold' : 'text-neutral-400 hover:text-neutral-700'
           }`}
           aria-label="Saved"
         >
-          {activeTab === 'saved' ? (
-            <HiHeart className="w-5.5 h-5.5 text-[#016A54]" />
-          ) : (
-            <FiHeart className="w-5 h-5" />
-          )}
-          {savedIds.length > 0 && (
-            <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-[#016A54] ring-2 ring-white"></span>
-          )}
+          <div className="relative">
+            {activeTab === 'saved' ? (
+              <HiHeart className="w-5.5 h-5.5 text-[#016A54]" />
+            ) : (
+              <FiHeart className="w-5 h-5" />
+            )}
+            {savedIds?.length > 0 && (
+              <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-[#016A54] ring-2 ring-white"></span>
+            )}
+          </div>
           <span className="text-[10px] mt-0.5 font-medium tracking-tight">Saved</span>
         </button>
 
@@ -131,7 +133,7 @@ const BottomNav = React.memo(() => {
         <button
           type="button"
           onClick={() => navigate('/user/account')}
-          className={`flex flex-col items-center justify-center w-14 h-12 transition-all active:scale-95 ${
+          className={`flex-1 flex flex-col items-center justify-center h-12 transition-all active:scale-95 cursor-pointer ${
             activeTab === 'profile' ? 'text-[#016A54] font-extrabold' : 'text-neutral-400 hover:text-neutral-700'
           }`}
           aria-label="Profile"
