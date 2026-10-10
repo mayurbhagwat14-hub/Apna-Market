@@ -16,6 +16,12 @@ export default defineConfig(({ command }) => ({
       },
     },
   ].filter(Boolean),
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
   esbuild: {
     legalComments: 'none',
     drop: command === 'build' ? ['console', 'debugger'] : [],

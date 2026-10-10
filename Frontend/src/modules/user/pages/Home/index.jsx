@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FiSearch,
@@ -28,8 +28,8 @@ const Home = () => {
   const { currentCity, userLocation } = useCity();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const searchContainerRef = React.useRef(null);
-  const sentinelRef = React.useRef(null);
+  const searchContainerRef = useRef(null);
+  const sentinelRef = useRef(null);
 
   const [categories, setCategories] = useState([]);
   const [businesses, setBusinesses] = useState([]);
