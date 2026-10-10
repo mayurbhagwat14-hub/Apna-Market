@@ -7,15 +7,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     react(),
-    command === 'build' && {
-      name: 'exit-on-build-finish',
-      closeBundle() {
-        setTimeout(() => {
-          process.exit(0);
-        }, 150);
-      },
-    },
-  ].filter(Boolean),
+  ],
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
@@ -30,79 +22,39 @@ export default defineConfig(({ command }) => ({
     target: 'esnext',
     minify: 'esbuild',
     cssMinify: 'esbuild',
-    cssCodeSplit: true,
+    cssCodeSplit: false,
+    emptyOutDir: true,
     sourcemap: false,
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1200,
     modulePreload: {
       polyfill: false,
     },
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
+        manualChunks: (() => {
+          const VENDOR_REACT = /[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/;
+          const VENDOR_RECHARTS = /[\\/]node_modules[\\/](recharts|d3-|victory-vendor)/;
+          const VENDOR_GOOGLE_MAPS = /[\\/]node_modules[\\/]@react-google-maps/;
+          const VENDOR_LEAFLET = /[\\/]node_modules[\\/](leaflet|react-leaflet)/;
+          const VENDOR_MOTION = /[\\/]node_modules[\\/](framer-motion|gsap)/;
+          const VENDOR_FIREBASE = /[\\/]node_modules[\\/](firebase|@firebase)/;
+          const VENDOR_ICONS = /[\\/]node_modules[\\/](react-icons)/;
+          const VENDOR_UTILS = /[\\/]node_modules[\\/](axios|date-fns|zod|socket\.io-client|react-hot-toast)/;
 
-          const norm = id.split('\\').join('/');
-
-          // 1. Core React runtime & routing
-          if (
-            norm.includes('/react/') ||
-            norm.includes('/react-dom/') ||
-            norm.includes('/scheduler/') ||
-            norm.includes('/react-router/') ||
-            norm.includes('/react-router-dom/')
-          ) {
-            return 'vendor-react';
-          }
-
-          // 2. Charts & heavy data visualization (Recharts + d3 + victory)
-          if (
-            norm.includes('recharts') ||
-            norm.includes('d3-') ||
-            norm.includes('victory-vendor')
-          ) {
-            return 'vendor-recharts';
-          }
-
-          // 3. Google Maps API (standalone chunk)
-          if (norm.includes('@react-google-maps')) {
-            return 'vendor-maps-google';
-          }
-
-          // 4. Leaflet maps (standalone chunk, separate from Google Maps)
-          if (norm.includes('leaflet') || norm.includes('react-leaflet')) {
-            return 'vendor-maps-leaflet';
-          }
-
-          // 5. Animations
-          if (norm.includes('framer-motion')) {
-            return 'vendor-motion';
-          }
-          if (norm.includes('gsap')) {
-            return 'vendor-gsap';
-          }
-
-          // 6. Firebase & Realtime DB
-          if (norm.includes('firebase') || norm.includes('@firebase')) {
-            return 'vendor-firebase';
-          }
-
-          // 7. Icons
-          if (norm.includes('react-icons')) {
-            return 'vendor-icons';
-          }
-
-          // 8. Common HTTP, validation & realtime utilities
-          if (
-            norm.includes('axios') ||
-            norm.includes('date-fns') ||
-            norm.includes('zod') ||
-            norm.includes('socket.io-client') ||
-            norm.includes('react-hot-toast')
-          ) {
-            return 'vendor-utils';
-          }
-        },
+          return (id) => {
+            if (!id.includes('node_modules')) return;
+            if (VENDOR_REACT.test(id)) return 'vendor-react';
+            if (VENDOR_RECHARTS.test(id)) return 'vendor-recharts';
+            if (VENDOR_GOOGLE_MAPS.test(id)) return 'vendor-maps-google';
+            if (VENDOR_LEAFLET.test(id)) return 'vendor-maps-leaflet';
+            if (VENDOR_MOTION.test(id)) return 'vendor-motion';
+            if (VENDOR_FIREBASE.test(id)) return 'vendor-firebase';
+            if (VENDOR_ICONS.test(id)) return 'vendor-icons';
+            if (VENDOR_UTILS.test(id)) return 'vendor-utils';
+            return 'vendor-libs';
+          };
+        })(),
       },
     },
   },
