@@ -12,12 +12,13 @@ export default defineConfig(({ command }) => ({
       closeBundle() {
         setTimeout(() => {
           process.exit(0);
-        }, 300);
+        }, 150);
       },
     },
   ].filter(Boolean),
   esbuild: {
     legalComments: 'none',
+    drop: command === 'build' ? ['console', 'debugger'] : [],
   },
   build: {
     target: 'esnext',
@@ -26,29 +27,74 @@ export default defineConfig(({ command }) => ({
     cssCodeSplit: true,
     sourcemap: false,
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 800,
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
 
-          if (id.includes('react-icons')) {
-            return 'vendor-icons';
+          const norm = id.split('\\').join('/');
+
+          // 1. Core React runtime & routing
+          if (
+            norm.includes('/react/') ||
+            norm.includes('/react-dom/') ||
+            norm.includes('/scheduler/') ||
+            norm.includes('/react-router/') ||
+            norm.includes('/react-router-dom/')
+          ) {
+            return 'vendor-react';
           }
-          if (id.includes('recharts')) {
+
+          // 2. Charts & heavy data visualization (Recharts + d3 + victory)
+          if (
+            norm.includes('recharts') ||
+            norm.includes('d3-') ||
+            norm.includes('victory-vendor')
+          ) {
             return 'vendor-recharts';
           }
-          if (id.includes('framer-motion') || id.includes('gsap')) {
+
+          // 3. Google Maps API (standalone chunk)
+          if (norm.includes('@react-google-maps')) {
+            return 'vendor-maps-google';
+          }
+
+          // 4. Leaflet maps (standalone chunk, separate from Google Maps)
+          if (norm.includes('leaflet') || norm.includes('react-leaflet')) {
+            return 'vendor-maps-leaflet';
+          }
+
+          // 5. Animations
+          if (norm.includes('framer-motion')) {
             return 'vendor-motion';
           }
-          if (id.includes('firebase')) {
+          if (norm.includes('gsap')) {
+            return 'vendor-gsap';
+          }
+
+          // 6. Firebase & Realtime DB
+          if (norm.includes('firebase') || norm.includes('@firebase')) {
             return 'vendor-firebase';
           }
-          if (id.includes('leaflet') || id.includes('@react-google-maps')) {
-            return 'vendor-maps';
+
+          // 7. Icons
+          if (norm.includes('react-icons')) {
+            return 'vendor-icons';
           }
-          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('react-router')) {
-            return 'vendor-react';
+
+          // 8. Common HTTP, validation & realtime utilities
+          if (
+            norm.includes('axios') ||
+            norm.includes('date-fns') ||
+            norm.includes('zod') ||
+            norm.includes('socket.io-client') ||
+            norm.includes('react-hot-toast')
+          ) {
+            return 'vendor-utils';
           }
         },
       },
