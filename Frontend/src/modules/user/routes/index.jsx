@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import PageTransition from '../components/common/PageTransition';
 import BottomNav from '../components/layout/BottomNav';
 import Footer from '../components/layout/Footer';
@@ -108,6 +108,7 @@ const UserRoutes = () => {
   const bottomNavPages = [
     '/user',
     '/user/',
+    '/user/home',
     '/user/explore',
     '/user/map',
     '/user/nearby',
@@ -143,10 +144,16 @@ const UserRoutes = () => {
               <Route path="/signup" element={<PublicRoute userType="user"><Signup /></PublicRoute>} />
 
               {/* Browsable routes (Guest-friendly) */}
+              <Route index element={<Home />} />
+              <Route path="" element={<Home />} />
               <Route path="/" element={<Home />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/Home" element={<Home />} />
               <Route path="/explore" element={<Explore />} />
               <Route path="/map" element={<NearbyMap />} />
+              <Route path="/nearby" element={<NearbyMap />} />
               <Route path="/saved" element={<Saved />} />
+              <Route path="/favorites" element={<Saved />} />
               <Route path="/all-services" element={<AllServices />} />
               <Route path="/category/:categoryId" element={<CategoryListings />} />
               <Route path="/listings/:id" element={<ListingDetail />} />
@@ -158,12 +165,13 @@ const UserRoutes = () => {
               <Route path="/cancellation-policy" element={<CancellationPolicy />} />
 
               {/* Protected routes (auth required for account, orders, payments) */}
-
+              <Route path="/profile" element={<ProtectedRoute userType="user"><Account /></ProtectedRoute>} />
               <Route path="/rewards" element={<ProtectedRoute userType="user"><Rewards /></ProtectedRoute>} />
               <Route path="/account" element={<ProtectedRoute userType="user"><Account /></ProtectedRoute>} />
               <Route path="/cart" element={<ProtectedRoute userType="user"><Cart /></ProtectedRoute>} />
               <Route path="/checkout" element={<ProtectedRoute userType="user"><Checkout /></ProtectedRoute>} />
               <Route path="/my-bookings" element={<ProtectedRoute userType="user"><MyBookings /></ProtectedRoute>} />
+              <Route path="/orders" element={<ProtectedRoute userType="user"><MyBookings /></ProtectedRoute>} />
               <Route path="/booking/:id" element={<ProtectedRoute userType="user"><BookingDetails /></ProtectedRoute>} />
               <Route path="/booking/:id/track" element={<ProtectedRoute userType="user"><BookingTrack /></ProtectedRoute>} />
               <Route path="/booking-confirmation/:id" element={<ProtectedRoute userType="user"><BookingConfirmation /></ProtectedRoute>} />
@@ -174,12 +182,12 @@ const UserRoutes = () => {
               <Route path="/my-plan" element={<ProtectedRoute userType="user"><MyPlan /></ProtectedRoute>} />
               <Route path="/my-plan/:id" element={<ProtectedRoute userType="user"><PlanDetails /></ProtectedRoute>} />
               <Route path="/my-rating" element={<ProtectedRoute userType="user"><MyRating /></ProtectedRoute>} />
-              <Route path="/about-app" element={<ProtectedRoute userType="user"><AboutApp /></ProtectedRoute>} />
               <Route path="/update-profile" element={<ProtectedRoute userType="user"><UpdateProfile /></ProtectedRoute>} />
 
               <Route path="/notifications" element={<ProtectedRoute userType="user"><Notifications /></ProtectedRoute>} />
-              <Route path="/help-support" element={<ProtectedRoute userType="user"><HelpSupport /></ProtectedRoute>} />
-              <Route path="/cancellation-policy" element={<ProtectedRoute userType="user"><CancellationPolicy /></ProtectedRoute>} />
+
+              {/* Catch-all fallback inside UserRoutes to avoid blank screens */}
+              <Route path="*" element={<Navigate to="" replace />} />
             </Routes>
           </PageTransition>
         </Suspense>

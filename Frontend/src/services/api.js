@@ -6,8 +6,21 @@ import {
   invalidateAfterMutation
 } from '../utils/apiCache';
 
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// API Base URL - Intelligent detection for production vs localhost
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return `${window.location.origin}/api`;
+      }
+    }
+  }
+  return envUrl || 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance
 const api = axios.create({

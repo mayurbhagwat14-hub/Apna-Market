@@ -13,6 +13,7 @@ const BottomNav = React.memo(() => {
   const ALLOWED_PATHS = [
     '/user',
     '/user/',
+    '/user/home',
     '/user/explore',
     '/user/map',
     '/user/nearby',
@@ -43,7 +44,7 @@ const BottomNav = React.memo(() => {
 
   const getActiveTab = () => {
     const path = location.pathname;
-    if (path === '/user' || path === '/user/') return 'home';
+    if (path === '/user' || path === '/user/' || path === '/user/home') return 'home';
     if (path.includes('/explore') || path.includes('/all-services') || path.startsWith('/user/category')) return 'explore';
     if (path.includes('/map') || path.includes('/nearby')) return 'map';
     if (path.includes('/saved') || path.includes('/favorites')) return 'saved';

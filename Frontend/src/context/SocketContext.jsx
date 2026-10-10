@@ -65,7 +65,20 @@ const SwipeableNotification = ({ t, data, onClick }) => {
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
+const getSocketUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.startsWith('/') || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return window.location.origin;
+      }
+    }
+  }
+  return envUrl?.replace(/\/api$/, '') || 'http://localhost:5000';
+};
+
+const SOCKET_URL = getSocketUrl();
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
