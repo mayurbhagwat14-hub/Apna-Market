@@ -329,6 +329,31 @@ const register = async (req, res) => {
       }
     }
 
+    const incomingAddress = req.body.address || {};
+    let vLat = Number(incomingAddress.lat || req.body.lat);
+    let vLng = Number(incomingAddress.lng || req.body.lng);
+    let hasValidCoords = !isNaN(vLat) && !isNaN(vLng) && vLat !== 0 && vLng !== 0;
+
+    if (!hasValidCoords && incomingAddress.fullAddress) {
+      try {
+        const { geocodeAddress } = require('../../services/locationService');
+        const geocoded = await geocodeAddress(incomingAddress.fullAddress);
+        if (geocoded && geocoded.lat && geocoded.lng) {
+          vLat = geocoded.lat;
+          vLng = geocoded.lng;
+          incomingAddress.lat = vLat;
+          incomingAddress.lng = vLng;
+          hasValidCoords = true;
+        }
+      } catch (geoErr) {
+        console.warn('Vendor registration geocoding fallback warning:', geoErr.message);
+      }
+    }
+
+    const geoPoint = hasValidCoords
+      ? { type: 'Point', coordinates: [vLng, vLat] }
+      : undefined;
+
     const vendor = await Vendor.create({
       name, email, phone, gender: req.body.gender || 'Male',
       providerType,
@@ -350,7 +375,11 @@ const register = async (req, res) => {
         backDocument: aadharBackUrl
       },
       pan: { number: pan, document: panUrl },
-      address: req.body.address || {},
+      address: {
+        ...incomingAddress,
+        ...(hasValidCoords ? { lat: vLat, lng: vLng } : {})
+      },
+      ...(geoPoint ? { location: geoPoint, geoLocation: geoPoint } : {}),
       bankDetails: req.body.bankDetails || {},
       profilePhoto: profilePhotoUrl,
       otherDocuments: otherUrls,

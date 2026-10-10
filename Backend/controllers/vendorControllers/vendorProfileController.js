@@ -255,7 +255,9 @@ const updateProfile = async (req, res) => {
       } else {
         vendor.address = { ...vendor.address, ...address };
         if (address.lat && address.lng) {
-          vendor.geoLocation = { type: 'Point', coordinates: [parseFloat(address.lng), parseFloat(address.lat)] };
+          const pt = { type: 'Point', coordinates: [parseFloat(address.lng), parseFloat(address.lat)] };
+          vendor.geoLocation = pt;
+          vendor.location = pt;
         }
       }
     }
@@ -312,7 +314,9 @@ const updateAddress = async (req, res) => {
       lng: parseFloat(lng)
     };
 
-    vendor.geoLocation = { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] };
+    const pt = { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] };
+    vendor.geoLocation = pt;
+    vendor.location = pt;
     await vendor.save();
 
     res.status(200).json({ success: true, message: 'Address updated successfully', address: vendor.address });

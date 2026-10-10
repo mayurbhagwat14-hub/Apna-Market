@@ -21,7 +21,7 @@ import BusinessCard from '../../components/common/BusinessCard';
 import HeroBannerCarousel from './components/HeroBannerCarousel';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { useCity } from '../../../../context/CityContext';
-import { sortShopsByProximity } from '../../../../utils/distance';
+import { sortShopsByProximity, deduplicateShopListings } from '../../../../utils/distance';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -342,39 +342,44 @@ const Home = () => {
 
   const allListings = businesses.length > 0 ? businesses : showcaseDefaults;
 
-  // Closest stores near the user (< 3 km or closest 8 stores)
-  const nearestListings = useMemo(() => {
-    return [...allListings].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999)).slice(0, 8);
+  // Deduplicated listings by unique physical shop/vendor for general discovery
+  const uniqueShops = useMemo(() => {
+    return deduplicateShopListings(allListings);
   }, [allListings]);
 
-  // Top Rated in City (4.5★ and above)
+  // Closest stores near the user (< 3 km or closest 8 stores), deduplicated by shop
+  const nearestListings = useMemo(() => {
+    return [...uniqueShops].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999)).slice(0, 8);
+  }, [uniqueShops]);
+
+  // Top Rated in City (4.5★ and above), deduplicated by shop
   const topRatedListings = useMemo(() => {
-    return [...allListings]
+    return [...uniqueShops]
       .filter((item) => Number(item.rating || item.dynamicFormAnswers?.rating || 0) >= 4.5)
       .slice(0, 6);
-  }, [allListings]);
+  }, [uniqueShops]);
 
   // Filtered listings for the main continuous stream ("scroll karta raho khtm na ho")
   const filteredListings = useMemo(() => {
-    if (activeFilter === 'all') return allListings;
+    if (activeFilter === 'all') return uniqueShops;
     if (activeFilter === 'nearest') {
-      return [...allListings].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+      return [...uniqueShops].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
     }
     if (activeFilter === 'top-rated') {
-      return [...allListings].filter((item) => Number(item.rating || item.dynamicFormAnswers?.rating || 0) >= 4.5);
+      return [...uniqueShops].filter((item) => Number(item.rating || item.dynamicFormAnswers?.rating || 0) >= 4.5);
     }
     return allListings.filter((item) => {
       const catSlug = (item.category?.slug || item.categorySlug || item.categoryName || '').toLowerCase();
       const catId = item.categoryId || item.category?._id || item.category;
       return catSlug.includes(activeFilter.toLowerCase()) || catId === activeFilter;
     });
-  }, [allListings, activeFilter]);
+  }, [allListings, uniqueShops, activeFilter]);
 
   const searchSuggestions = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return { matchingShops: [], matchingCats: [] };
 
-    const matchingShops = allListings.filter((item) => {
+    const matchingShops = uniqueShops.filter((item) => {
       const title = (item.title || '').toLowerCase();
       const bizName = (item.businessName || item.provider?.businessName || item.provider?.name || '').toLowerCase();
       const cat = (item.categoryName || item.category?.title || '').toLowerCase();
@@ -389,7 +394,7 @@ const Home = () => {
     }).slice(0, 3);
 
     return { matchingShops, matchingCats };
-  }, [searchQuery, allListings, displayCategories]);
+  }, [searchQuery, uniqueShops, displayCategories]);
 
   return (
     <div className="min-h-screen bg-[#FBFBFA] pb-28 font-sans w-full relative select-none overflow-x-hidden">
@@ -429,7 +434,7 @@ const Home = () => {
                   setIsSearchOpen(true);
                 }}
                 placeholder="Search shops, restaurants, services..."
-                className="w-full pl-11 pr-20 py-3 sm:py-3.5 bg-white rounded-full border border-neutral-200/90 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54] transition-all"
+                className="w-full pl-11 pr-20 py-3.5 sm:py-4 bg-white rounded-full border border-black/[0.04] text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 shadow-[0_4px_20px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54]/40 transition-all"
               />
               <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                 {searchQuery && (
@@ -567,10 +572,10 @@ const Home = () => {
                       navigate(`/user/category/${cat.slug}`);
                     }
                   }}
-                  className="bg-white rounded-2xl border border-neutral-150/80 p-2.5 sm:p-4 flex flex-col items-center justify-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:border-[#016A54]/40 hover:shadow-md active:scale-95 transition-all group cursor-pointer"
+                  className="bg-white rounded-2xl border border-black/[0.04] p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-[0_4px_16px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_28px_rgba(1,106,84,0.14)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group cursor-pointer"
                 >
                   <div
-                    className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl overflow-hidden mb-1.5 transition-transform group-hover:scale-105 shadow-2xs border border-neutral-100/90 relative flex items-center justify-center bg-neutral-50"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden mb-2 transition-transform duration-200 group-hover:scale-105 shadow-[0_2px_8px_rgba(0,0,0,0.06)] relative flex items-center justify-center bg-neutral-50"
                     style={{ backgroundColor: cat.bgColor }}
                   >
                     {cat.photo ? (
@@ -613,7 +618,7 @@ const Home = () => {
               <div>
                 <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight flex items-center gap-1.5">
                   <span>Nearest Stores to You</span>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 shadow-2xs border border-emerald-100/60">
                     Proximity
                   </span>
                 </h2>
@@ -648,7 +653,7 @@ const Home = () => {
         {/* 6. Neighborhood Discovery Banner */}
         <section 
           onClick={() => navigate('/user/map')}
-          className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#EDF8F5] via-[#E2F4EE] to-[#EDF8F5] border border-[#ADE2D7]/70 p-4 sm:p-5 flex items-center justify-between shadow-2xs cursor-pointer active:scale-[0.99] transition-all hover:border-[#016A54]/40"
+          className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#EDF8F5] via-[#E2F4EE] to-[#EDF8F5] p-4 sm:p-5 flex items-center justify-between shadow-[0_4px_20px_rgba(1,106,84,0.07)] border border-emerald-600/10 cursor-pointer active:scale-[0.99] transition-all hover:shadow-[0_8px_28px_rgba(1,106,84,0.12)]"
         >
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#016A54] text-white font-black text-sm sm:text-base flex items-center justify-center shrink-0 shadow-md">
@@ -675,7 +680,7 @@ const Home = () => {
               <div>
                 <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight flex items-center gap-1.5">
                   <span>Top Rated in {currentCity?.name || 'Your Area'}</span>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 shadow-2xs border border-amber-100/60">
                     ★ 4.5+ Rated
                   </span>
                 </h2>
@@ -699,37 +704,37 @@ const Home = () => {
             <button
               type="button"
               onClick={() => setActiveFilter('all')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-[13px] font-semibold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
                 activeFilter === 'all'
-                  ? 'bg-[#016A54] text-white shadow-sm'
-                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+                  ? 'bg-[#016A54] text-white shadow-[0_4px_12px_rgba(1,106,84,0.25)] border border-[#016A54]'
+                  : 'bg-white text-neutral-600 hover:text-neutral-900 border border-black/[0.05] shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-xs hover:border-black/[0.09]'
               }`}
             >
-              All Stores ({allListings.length})
+              All Stores
             </button>
 
             <button
               type="button"
               onClick={() => setActiveFilter('nearest')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-[13px] font-semibold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
                 activeFilter === 'nearest'
-                  ? 'bg-[#016A54] text-white shadow-sm'
-                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+                  ? 'bg-[#016A54] text-white shadow-[0_4px_12px_rgba(1,106,84,0.25)] border border-[#016A54]'
+                  : 'bg-white text-neutral-600 hover:text-neutral-900 border border-black/[0.05] shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-xs hover:border-black/[0.09]'
               }`}
             >
-              <span>⚡ Nearest First</span>
+              Nearest First
             </button>
 
             <button
               type="button"
               onClick={() => setActiveFilter('top-rated')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-[13px] font-semibold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
                 activeFilter === 'top-rated'
-                  ? 'bg-[#016A54] text-white shadow-sm'
-                  : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+                  ? 'bg-[#016A54] text-white shadow-[0_4px_12px_rgba(1,106,84,0.25)] border border-[#016A54]'
+                  : 'bg-white text-neutral-600 hover:text-neutral-900 border border-black/[0.05] shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-xs hover:border-black/[0.09]'
               }`}
             >
-              <span>⭐ Top Rated</span>
+              Top Rated
             </button>
 
             {categories.filter(c => c.showOnHome !== false).map((cat) => (
@@ -737,10 +742,10 @@ const Home = () => {
                 key={cat.id || cat._id}
                 type="button"
                 onClick={() => setActiveFilter(cat.slug || cat.id)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                className={`px-4 py-2 rounded-full text-[13px] font-semibold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
                   activeFilter === (cat.slug || cat.id)
-                    ? 'bg-[#016A54] text-white shadow-sm'
-                    : 'bg-white text-neutral-700 border border-neutral-200/90 hover:border-neutral-300'
+                    ? 'bg-[#016A54] text-white shadow-[0_4px_12px_rgba(1,106,84,0.25)] border border-[#016A54]'
+                    : 'bg-white text-neutral-600 hover:text-neutral-900 border border-black/[0.05] shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-xs hover:border-black/[0.09]'
                 }`}
               >
                 {cat.title}
@@ -762,9 +767,6 @@ const Home = () => {
                 Live vendor listings ranked by proximity • Keep scrolling to discover more
               </p>
             </div>
-            <span className="text-xs font-extrabold text-[#016A54] px-2.5 py-1 rounded-full bg-[#EDF8F5]">
-              {filteredListings.length} {filteredListings.length === 1 ? 'store' : 'stores'}
-            </span>
           </div>
 
           {filteredListings.length > 0 ? (
@@ -778,7 +780,7 @@ const Home = () => {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-neutral-150 p-8 text-center space-y-3">
+            <div className="bg-white rounded-2xl border border-black/[0.03] p-8 text-center space-y-3 shadow-md shadow-black/5">
               <div className="w-12 h-12 rounded-full bg-neutral-100 mx-auto flex items-center justify-center text-xl">
                 🔍
               </div>
@@ -791,7 +793,7 @@ const Home = () => {
               <button
                 type="button"
                 onClick={() => setActiveFilter('all')}
-                className="px-4 py-2 rounded-xl bg-[#016A54] text-white text-xs font-bold hover:bg-[#015B48] transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#016A54] text-white text-xs font-bold hover:bg-[#015B48] transition-colors cursor-pointer shadow-xs"
               >
                 Show All Stores
               </button>
@@ -805,7 +807,7 @@ const Home = () => {
           {isLoadingMore && (
             <div className="pt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5 animate-pulse">
               {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="bg-white rounded-2xl border border-neutral-150 p-3 space-y-2.5">
+                <div key={n} className="bg-white rounded-2xl border border-black/[0.03] p-3 space-y-2.5 shadow-sm">
                   <div className="w-full aspect-[4/3] rounded-xl bg-neutral-200" />
                   <div className="h-3.5 bg-neutral-200 rounded w-3/4" />
                   <div className="h-3 bg-neutral-100 rounded w-1/2" />
@@ -817,7 +819,7 @@ const Home = () => {
 
           {/* End of Feed Celebratory Banner */}
           {!hasMore && filteredListings.length > 0 && !isLoadingMore && (
-            <div className="mt-8 p-5 bg-gradient-to-r from-[#EDF8F5] via-white to-[#EDF8F5] rounded-2xl border border-[#ADE2D7]/50 text-center space-y-2">
+            <div className="mt-8 p-5 bg-gradient-to-r from-[#EDF8F5] via-white to-[#EDF8F5] rounded-2xl border border-emerald-600/10 shadow-[0_4px_20px_rgba(1,106,84,0.06)] text-center space-y-2">
               <span className="text-2xl">✨</span>
               <h4 className="text-xs sm:text-sm font-black text-[#01352A]">
                 You've explored all {filteredListings.length} local businesses near you in {currentCity?.name || 'this area'}!

@@ -5,7 +5,6 @@ const axios = require('axios');
  * Handles location-based operations using Google Maps API
  */
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com/maps/api';
 
 /**
@@ -33,7 +32,8 @@ const calculateDistance = (coord1, coord2) => {
  */
 const geocodeAddress = async (address) => {
   try {
-    if (!GOOGLE_MAPS_API_KEY) {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (!key) {
       console.warn('Google Maps API key not configured, geocoding skipped');
       return null;
     }
@@ -41,7 +41,7 @@ const geocodeAddress = async (address) => {
     const response = await axios.get(`${GOOGLE_MAPS_API_URL}/geocode/json`, {
       params: {
         address: address,
-        key: GOOGLE_MAPS_API_KEY
+        key: key
       }
     });
 
@@ -247,7 +247,8 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
 
 const getDistanceMatrix = async (origins, destinations) => {
   try {
-    if (!GOOGLE_MAPS_API_KEY) {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (!key) {
       console.warn('Google Maps API key not configured, using mock distances');
       // Return mock distances
       return origins.map(() => destinations.map(() => ({ distance: { value: 5000 } })));
@@ -260,7 +261,7 @@ const getDistanceMatrix = async (origins, destinations) => {
       params: {
         origins: originsStr,
         destinations: destinationsStr,
-        key: GOOGLE_MAPS_API_KEY,
+        key: key,
         units: 'metric'
       }
     });

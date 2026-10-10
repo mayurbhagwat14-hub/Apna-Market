@@ -643,6 +643,36 @@ const getPublicServiceListings = async (req, res) => {
 
     let validListings = listings.map(toPublicListingDto).filter(Boolean);
 
+    // If querying all categories (no specific category selected), deduplicate by physical vendor/store
+    if (!categoryId && (!categorySlug || categorySlug === 'all')) {
+      const uniqueMap = new Map();
+      for (const item of validListings) {
+        const vId = item.vendorId?._id || item.vendorId || item.provider?._id || item.provider?.id;
+        const rawName = (item.businessName || item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const key = vId ? `v-${vId}` : (rawName ? `n-${rawName}` : String(item._id || item.id));
+
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, item);
+        } else {
+          const existing = uniqueMap.get(key);
+          const existingCat = (existing.categorySlug || existing.categoryName || '').toLowerCase();
+          const newCat = (item.categorySlug || item.categoryName || '').toLowerCase();
+          const existingIsGeneric = existingCat === 'shops' || existingCat === 'all-stores';
+          const newIsSpecific = newCat && newCat !== 'shops' && newCat !== 'all-stores';
+
+          const existingReviews = Number(existing.reviewsCount || existing.provider?.reviews || 0);
+          const newReviews = Number(item.reviewsCount || item.provider?.reviews || 0);
+
+          if (existingIsGeneric && newIsSpecific) {
+            uniqueMap.set(key, item);
+          } else if (newReviews > existingReviews) {
+            uniqueMap.set(key, item);
+          }
+        }
+      }
+      validListings = Array.from(uniqueMap.values());
+    }
+
     const userLat = (lat !== undefined && lat !== null && lat !== '') ? Number(lat) : null;
     const userLng = (lng !== undefined && lng !== null && lng !== '') ? Number(lng) : null;
 

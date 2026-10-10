@@ -54,7 +54,7 @@ const BusinessListCard = ({ business, className = '' }) => {
   return (
     <div
       onClick={handleClick}
-      className={`group bg-white rounded-2xl border border-neutral-150/80 p-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_20px_rgba(1,106,84,0.06)] hover:border-primary-200 transition-all cursor-pointer flex items-center gap-3.5 ${className}`}
+      className={`group bg-white rounded-2xl border border-black/[0.04] p-3 shadow-[0_4px_16px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_28px_rgba(1,106,84,0.1)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${className}`}
     >
       {/* Square Image */}
       <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-neutral-100 shrink-0">

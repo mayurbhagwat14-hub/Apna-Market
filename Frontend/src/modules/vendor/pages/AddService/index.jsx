@@ -8,6 +8,7 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../../../../services/api';
 import DynamicField, { FormInput, FormTextarea, DynamicFormFields } from '../../components/common/DynamicField';
+import VendorLocationPicker from '../../components/common/VendorLocationPicker';
 import {
   buildListingSteps,
   validateDynamicSchema,
@@ -34,6 +35,8 @@ const EMPTY_FORM = {
   landmark: '',
   city: 'Indore',
   pincode: '',
+  lat: null,
+  lng: null,
   operatingHours: '10:00 AM - 9:30 PM',
   bannerPhoto: null,
   frontPhoto: null,
@@ -236,6 +239,18 @@ const AddService = () => {
           areas: [form.address, form.landmark].filter(Boolean),
           pincodes: form.pincode ? [form.pincode] : []
         },
+        address: {
+          fullAddress: form.address,
+          landmark: form.landmark,
+          city: form.city || 'Indore',
+          pincode: form.pincode,
+          lat: form.lat != null ? Number(form.lat) : undefined,
+          lng: form.lng != null ? Number(form.lng) : undefined
+        },
+        location: (form.lat != null && form.lng != null) ? {
+          type: 'Point',
+          coordinates: [Number(form.lng), Number(form.lat)]
+        } : undefined,
         availability: {
           workingDays: form.availabilityFormAnswers?.workingDays || {},
           operatingHours: form.operatingHours || '10:00 AM - 9:30 PM'
@@ -553,6 +568,21 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
 
       {/* Address & Location */}
       <SectionCard title="Dukaan ka Pata & Location (Address)" icon="📍">
+        <div className="mb-3">
+          <VendorLocationPicker
+            initialPosition={form.lat && form.lng ? { lat: form.lat, lng: form.lng } : null}
+            onLocationSelect={(loc) => {
+              if (loc.fullAddress) updateForm('address', loc.fullAddress);
+              if (loc.city) updateForm('city', loc.city);
+              if (loc.pincode) updateForm('pincode', loc.pincode);
+              if (loc.landmark) updateForm('landmark', loc.landmark);
+              if (loc.lat) updateForm('lat', loc.lat);
+              if (loc.lng) updateForm('lng', loc.lng);
+            }}
+            placeholder="Search shop location, market, or landmark..."
+          />
+        </div>
+
         <FormInput
           label="Full Address & Shop No. *"
           value={form.address}

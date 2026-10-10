@@ -103,3 +103,57 @@ export const sortShopsByProximity = (shops = [], userLocation = DEFAULT_USER_LOC
 
   return processed.sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
 };
+
+/**
+ * Deduplicates shop listings by vendor or store name so that each physical store
+ * appears only once in broad discovery feeds (like "All Stores" on Home or Explore).
+ * When multiple category listings exist for the same shop, it intelligently picks the best
+ * representative listing (favoring specific category tags, real review counts, or catalog items).
+ */
+export const deduplicateShopListings = (listings = []) => {
+  if (!Array.isArray(listings) || listings.length === 0) return [];
+
+  const map = new Map();
+
+  for (const item of listings) {
+    if (!item) continue;
+
+    const vendorId = item.vendorId?._id || item.vendorId || item.provider?._id || item.provider?.id;
+    const rawName = (item.businessName || item.title || item.name || item.dynamicFormAnswers?.shopName || '').trim();
+    const cleanName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Formulate a robust grouping key per physical shop/vendor
+    const key = vendorId ? `vendor-${vendorId}` : (cleanName ? `name-${cleanName}` : (item._id || item.id));
+
+    if (!map.has(key)) {
+      map.set(key, item);
+    } else {
+      const existing = map.get(key);
+
+      const existingCat = (existing.category?.slug || existing.categorySlug || existing.categoryName || '').toLowerCase();
+      const newCat = (item.category?.slug || item.categorySlug || item.categoryName || '').toLowerCase();
+
+      const existingIsGeneric = existingCat === 'shops' || existingCat === 'all-stores' || !existingCat;
+      const newIsSpecific = newCat && newCat !== 'shops' && newCat !== 'all-stores';
+
+      const existingReviews = Number(existing.reviewsCount || existing.reviewCount || existing.dynamicFormAnswers?.reviewCount || 0);
+      const newReviews = Number(item.reviewsCount || item.reviewCount || item.dynamicFormAnswers?.reviewCount || 0);
+
+      const existingItemsCount = Array.isArray(existing.catalogItems) ? existing.catalogItems.length : 0;
+      const newItemsCount = Array.isArray(item.catalogItems) ? item.catalogItems.length : 0;
+
+      // Prefer listing that is specific (e.g. "clothing" over generic "shops")
+      // or has higher actual reviews or catalog items
+      if (existingIsGeneric && newIsSpecific) {
+        map.set(key, item);
+      } else if (!newIsSpecific && existingIsGeneric && newReviews > existingReviews) {
+        map.set(key, item);
+      } else if (newIsSpecific && !existingIsGeneric && (newReviews > existingReviews || newItemsCount > existingItemsCount)) {
+        map.set(key, item);
+      }
+    }
+  }
+
+  return Array.from(map.values());
+};
+

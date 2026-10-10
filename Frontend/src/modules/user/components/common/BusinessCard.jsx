@@ -57,7 +57,7 @@ const BusinessCard = ({ business, className = '', imageAspect = 'aspect-[4/3]' }
   return (
     <div
       onClick={handleClick}
-      className={`group bg-white rounded-2xl border border-neutral-150/80 p-2.5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(1,106,84,0.08)] hover:border-primary-200 transition-all cursor-pointer flex flex-col justify-between ${className}`}
+      className={`group bg-white rounded-2xl border border-black/[0.04] p-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_28px_rgba(1,106,84,0.12)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between ${className}`}
     >
       {/* Image Container with enforced aspect ratio */}
       <div 

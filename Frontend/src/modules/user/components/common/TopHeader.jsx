@@ -26,7 +26,7 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#FBFBFA]/90 backdrop-blur-md border-b border-neutral-150/70 transition-all">
+      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-black/[0.03] shadow-[0_2px_12px_rgba(0,0,0,0.03)] transition-all">
         <div className="w-full max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           {/* Location Selector Button */}
           <button
@@ -35,10 +35,10 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
             className="flex items-center gap-2 group text-left max-w-[70%] sm:max-w-[65%] cursor-pointer"
             aria-label="Change location & address"
           >
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-2xs transition-colors border ${
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-xs transition-all ${
               isGps 
-                ? 'bg-emerald-600 text-white border-emerald-500'
-                : 'bg-[#EDF8F5] text-[#016A54] border-[#ADE2D7]/50 group-hover:bg-[#D5EFEB]'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-[#EDF8F5] text-[#016A54] group-hover:bg-[#D5EFEB]'
             }`}>
               {isGps ? <FiNavigation className="w-4 h-4" /> : <FiMapPin className="w-4 h-4 text-[#016A54]" />}
             </div>
@@ -67,7 +67,7 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
             <button
               type="button"
               onClick={() => navigate('/user/notifications')}
-              className="relative w-9 h-9 rounded-full bg-white border border-neutral-200 shadow-2xs flex items-center justify-center text-neutral-700 hover:text-[#016A54] hover:border-[#ADE2D7] transition-all active:scale-95 cursor-pointer"
+              className="relative w-9 h-9 rounded-full bg-white border border-black/[0.04] shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex items-center justify-center text-neutral-700 hover:text-[#016A54] hover:shadow-[0_4px_12px_rgba(1,106,84,0.12)] transition-all active:scale-95 cursor-pointer"
               aria-label="Notifications"
             >
               <FiBell className="w-4 h-4" />
@@ -82,7 +82,7 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
             <button
               type="button"
               onClick={() => navigate('/user/account')}
-              className="w-9 h-9 rounded-full bg-[#016A54] text-white font-black text-xs flex items-center justify-center overflow-hidden ring-2 ring-white shadow-2xs hover:ring-[#ADE2D7] transition-all active:scale-95 cursor-pointer"
+              className="w-9 h-9 rounded-full bg-[#016A54] text-white font-black text-xs flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer"
               aria-label="User Profile"
             >
               {userInitial ? (

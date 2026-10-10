@@ -5,7 +5,7 @@ import BusinessListCard from '../../components/common/BusinessListCard';
 import CategoryPill from '../../components/common/CategoryPill';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { useCity } from '../../../../context/CityContext';
-import { sortShopsByProximity } from '../../../../utils/distance';
+import { sortShopsByProximity, deduplicateShopListings } from '../../../../utils/distance';
 
 const Explore = () => {
   const navigate = useNavigate();
@@ -191,7 +191,7 @@ const Explore = () => {
     const q = searchQuery.toLowerCase().trim();
     const catKey = activeCategory.toLowerCase();
 
-    return allItems.filter((item) => {
+    const matches = allItems.filter((item) => {
       const title = (item.title || '').toLowerCase();
       const bizName = (item.businessName || item.provider?.businessName || item.provider?.name || '').toLowerCase();
       const catName = (
@@ -226,6 +226,8 @@ const Explore = () => {
 
       return matchesSearch && matchesCat;
     });
+
+    return catKey === 'all' ? deduplicateShopListings(matches) : matches;
   }, [allItems, searchQuery, activeCategory]);
 
   return (
@@ -259,7 +261,7 @@ const Explore = () => {
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search shops, vendor name, services..."
-            className="w-full pl-11 pr-20 py-3 sm:py-3.5 bg-white rounded-full border border-neutral-200/90 text-sm text-neutral-900 placeholder:text-neutral-400 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54] transition-all"
+            className="w-full pl-11 pr-20 py-3.5 sm:py-4 bg-white rounded-full border border-black/[0.04] text-sm text-neutral-900 placeholder:text-neutral-400 shadow-[0_4px_20px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] focus:outline-none focus:ring-2 focus:ring-[#016A54]/20 focus:border-[#016A54]/40 transition-all"
           />
           <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             {searchQuery && (
@@ -317,7 +319,7 @@ const Explore = () => {
             <BusinessListCard key={item._id || item.id} business={item} />
           ))
         ) : (
-          <div className="col-span-full text-center py-16 px-4 bg-white rounded-3xl border border-neutral-150/70 mt-4 shadow-2xs">
+          <div className="col-span-full text-center py-16 px-4 bg-white rounded-3xl border border-black/[0.03] mt-4 shadow-md shadow-black/5">
             <div className="w-14 h-14 rounded-full bg-[#EDF8F5] flex items-center justify-center text-[#016A54] mx-auto mb-3">
               <FiFrown className="w-7 h-7" />
             </div>

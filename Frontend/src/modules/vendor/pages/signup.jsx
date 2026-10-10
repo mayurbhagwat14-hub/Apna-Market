@@ -51,6 +51,7 @@ import {
   StepIndicator,
   DocumentUpload,
 } from '../../../components/ui';
+import VendorLocationPicker from '../components/common/VendorLocationPicker';
 import {
   handleAuthFlowError,
   getNetworkAuthMessage,
@@ -218,6 +219,8 @@ const VendorSignup = () => {
     city: '',
     state: '',
     pincode: '',
+    lat: null,
+    lng: null,
     aadhar: '',
     pan: '',
     accountHolderName: '',
@@ -237,6 +240,18 @@ const VendorSignup = () => {
   const [resendTimer, setResendTimer] = useState(0);
   const [fieldErrors, setFieldErrors] = useState({});
   const nameInputRef = useRef(null);
+
+  const handleLocationSelect = (loc) => {
+    setFormData((prev) => ({
+      ...prev,
+      fullAddress: loc.fullAddress || prev.fullAddress,
+      city: loc.city || prev.city,
+      state: loc.state || prev.state,
+      pincode: loc.pincode || prev.pincode,
+      lat: loc.lat,
+      lng: loc.lng,
+    }));
+  };
 
   // Persist state to both sessionStorage and localStorage whenever it changes
   useEffect(() => {
@@ -528,8 +543,14 @@ const VendorSignup = () => {
         fullAddress: formData.fullAddress,
         city: formData.city,
         state: formData.state,
-        pincode: formData.pincode
+        pincode: formData.pincode,
+        lat: formData.lat != null ? Number(formData.lat) : undefined,
+        lng: formData.lng != null ? Number(formData.lng) : undefined
       },
+      location: (formData.lat != null && formData.lng != null) ? {
+        type: 'Point',
+        coordinates: [Number(formData.lng), Number(formData.lat)]
+      } : undefined,
       aadhar: formData.aadhar,
       pan: formData.pan,
       service: selectedServices,
@@ -1082,6 +1103,15 @@ const VendorSignup = () => {
             />
           )}
 
+          {/* Interactive Google Maps Location Picker (Type Specific Location or Live GPS) */}
+          <div className="pt-1">
+            <VendorLocationPicker
+              initialPosition={formData.lat && formData.lng ? { lat: formData.lat, lng: formData.lng } : null}
+              onLocationSelect={handleLocationSelect}
+              placeholder="Search shop address, market, or landmark..."
+            />
+          </div>
+
           <Input
             label="Street Address / Location *"
             leftIcon={FiMapPin}
@@ -1090,25 +1120,27 @@ const VendorSignup = () => {
             placeholder="Shop / House No, Street, Landmark"
           />
 
-          <Input
-            label="City *"
-            value={formData.city}
-            onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
-            placeholder="e.g. Indore"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="City *"
+              value={formData.city}
+              onChange={(e) => setFormData((p) => ({ ...p, city: e.target.value }))}
+              placeholder="e.g. Indore"
+            />
+
+            <Input
+              label="Pincode *"
+              value={formData.pincode}
+              onChange={(e) => setFormData((p) => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+              placeholder="e.g. 452001"
+            />
+          </div>
 
           <Input
             label="State *"
             value={formData.state}
             onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))}
             placeholder="e.g. Madhya Pradesh"
-          />
-
-          <Input
-            label="Pincode *"
-            value={formData.pincode}
-            onChange={(e) => setFormData((p) => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-            placeholder="e.g. 452001"
           />
 
           <Button
