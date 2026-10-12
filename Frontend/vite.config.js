@@ -7,7 +7,15 @@ export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     react(),
-  ],
+    command === 'build' && {
+      name: 'force-exit-on-build',
+      closeBundle() {
+        setTimeout(() => {
+          process.exit(0);
+        }, 100);
+      },
+    },
+  ].filter(Boolean),
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
