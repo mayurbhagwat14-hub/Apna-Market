@@ -180,7 +180,7 @@ const Account = () => {
             </div>
             <div className="text-center cursor-pointer" onClick={() => navigate('/user/saved')}>
               <p className="text-base font-bold text-[#1A202C]">
-                {savedList.length > 0 ? savedList.length : 5}
+                {savedList?.length || 0}
               </p>
               <p className="text-[11px] text-[#718096]">Saved</p>
             </div>

@@ -38,16 +38,6 @@ const BusinessListCard = ({ business, className = '' }) => {
 
   const handleFavoriteClick = (e) => {
     e.stopPropagation();
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('showLoginPrompt', {
-        detail: {
-          title: 'Save to Favorites',
-          message: 'Login to save shops, follow businesses and personalize your experience.'
-        }
-      }));
-      return;
-    }
     toggleSave(business);
   };
 

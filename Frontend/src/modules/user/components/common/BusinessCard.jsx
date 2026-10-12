@@ -39,16 +39,6 @@ const BusinessCard = ({ business, className = '', imageAspect = 'aspect-[4/3]' }
 
   const handleFavoriteClick = (e) => {
     e.stopPropagation();
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('showLoginPrompt', {
-        detail: {
-          title: 'Save to Favorites',
-          message: 'Login to save shops, follow businesses and personalize your experience.'
-        }
-      }));
-      return;
-    }
     toggleSave(business);
   };
 
