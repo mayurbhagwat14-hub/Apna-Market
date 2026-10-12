@@ -9,10 +9,15 @@ export default defineConfig(({ command }) => ({
     react(),
     command === 'build' && {
       name: 'force-exit-on-build',
-      closeBundle() {
+      apply: 'build',
+      enforce: 'post',
+      writeBundle() {
         setTimeout(() => {
           process.exit(0);
-        }, 100);
+        }, 1200);
+      },
+      closeBundle() {
+        process.exit(0);
       },
     },
   ].filter(Boolean),
