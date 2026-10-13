@@ -37,7 +37,7 @@ const Account = () => {
     const toastId = toast.loading('Sending test notification...');
     try {
       const res = await sendTestPushNotification('user');
-      toast.success(res.message || 'Test notification sent! Check your notification bar.', { id: toastId });
+      toast.success(res.message || 'Test notification sent! Check your notification bar 🔔', { id: toastId });
     } catch (err) {
       toast.error(err.message || 'Failed to send notification', { id: toastId });
     } finally {

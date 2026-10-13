@@ -65,13 +65,28 @@ function App() {
         { duration: 5000, position: 'top-right' }
       );
 
-      // Try browser system notification if supported and granted
+      // Show system OS notification bar notification via ServiceWorker (Android & Desktop compatible)
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
-          new Notification(notifTitle, {
-            body: notifBody,
-            icon: '/Homster-logo.png'
-          });
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready
+              .then((reg) => {
+                reg.showNotification(notifTitle, {
+                  body: notifBody,
+                  icon: '/apna-market-icon.png',
+                  badge: '/apna-market-icon.png',
+                  data: data,
+                  vibrate: [200, 100, 200],
+                });
+              })
+              .catch(() => {
+                try {
+                  new Notification(notifTitle, { body: notifBody, icon: '/apna-market-icon.png' });
+                } catch (err) {}
+              });
+          } else {
+            new Notification(notifTitle, { body: notifBody, icon: '/apna-market-icon.png' });
+          }
         } catch (e) {}
       }
 

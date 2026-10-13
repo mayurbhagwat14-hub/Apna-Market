@@ -4,7 +4,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { getDatabase } from 'firebase/database';
 
 // Firebase configuration from environment variables
@@ -33,4 +33,4 @@ try {
   console.error('❌ Firebase initialization failed:', error);
 }
 
-export { app, messaging, db, getToken, onMessage };
+export { app, messaging, db, getToken, onMessage, deleteToken };

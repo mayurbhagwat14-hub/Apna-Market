@@ -3,7 +3,7 @@
  * Handles FCM token registration and notification handling
  */
 
-import { messaging, getToken, onMessage } from '../firebase';
+import { messaging, getToken, onMessage, deleteToken } from '../firebase';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
@@ -33,10 +33,8 @@ async function registerServiceWorker() {
       }).toString();
 
       const registration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${swParams}`);
-      // console.log('✅ Service Worker registered:', registration.scope);
       return registration;
     } catch (error) {
-      // console.error('❌ Service Worker registration failed:', error);
       throw error;
     }
   } else {
@@ -52,30 +50,37 @@ async function requestNotificationPermission() {
   if ('Notification' in window) {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      // console.log('✅ Notification permission granted');
       return true;
     } else {
-      // console.log('❌ Notification permission denied');
       return false;
     }
   }
-  // console.log('❌ Notifications not supported');
   return false;
 }
 
 /**
  * Get FCM token from Firebase
+ * @param {boolean} forceRefresh - If true, delete previous token from Firebase and generate fresh token
  * @returns {Promise<string|null>}
  */
-async function getFCMToken() {
+async function getFCMToken(forceRefresh = false) {
   try {
     if (!messaging) {
-      // console.error('Firebase messaging not initialized');
       return null;
     }
 
     const registration = await registerServiceWorker();
-    await registration.update(); // Update service worker
+    await registration.update();
+
+    if (forceRefresh) {
+      try {
+        console.log('[FCM] Deleting old cached FCM token...');
+        await deleteToken(messaging);
+        console.log('[FCM] Deleted old FCM token');
+      } catch (delErr) {
+        console.warn('[FCM] Could not delete old token:', delErr);
+      }
+    }
 
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
@@ -83,14 +88,12 @@ async function getFCMToken() {
     });
 
     if (token) {
-      // console.log('✅ FCM Token obtained:', token.substring(0, 20) + '...');
       return token;
     } else {
-      // console.log('❌ No FCM token available');
       return null;
     }
   } catch (error) {
-    // console.error('❌ Error getting FCM token:', error);
+    console.error('❌ Error getting FCM token:', error);
     throw error;
   }
 }
@@ -277,10 +280,25 @@ async function initializePushNotifications() {
 }
 
 /**
- * Send a test push notification to this user/vendor via backend
+ * Force clear old token from Firebase and register fresh token
  * @param {'user' | 'vendor'} userType
  */
-async function sendTestPushNotification(userType = 'user') {
+async function refreshNotificationToken(userType = 'user') {
+  console.log(`[FCM] Refreshing notification token for ${userType}...`);
+  const token = await getFCMToken(true);
+  if (token) {
+    await registerFCMToken(userType, true);
+  }
+  return token;
+}
+
+/**
+ * Send a test push notification to this user/vendor via backend
+ * @param {'user' | 'vendor'} userType
+ * @param {string|null} token
+ * @param {boolean} autoRetryOnMismatch
+ */
+async function sendTestPushNotification(userType = 'user', token = null, autoRetryOnMismatch = true) {
   const endpoint = userType === 'vendor' ? '/vendors/fcm-tokens/test' : '/users/fcm-tokens/test';
   const authTokenKey = userType === 'vendor' ? 'vendorAccessToken' : 'accessToken';
   const authToken = localStorage.getItem(authTokenKey) || sessionStorage.getItem(authTokenKey);
@@ -289,18 +307,36 @@ async function sendTestPushNotification(userType = 'user') {
     throw new Error(`Authentication token not found for ${userType}. Please login first.`);
   }
 
+  // Get current device token if not passed
+  let deviceToken = token;
+  if (!deviceToken) {
+    deviceToken = await getFCMToken().catch(() => null);
+  }
+
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
   const response = await fetch(`${baseUrl}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${authToken}`
-    }
+    },
+    body: JSON.stringify({
+      token: deviceToken
+    })
   });
 
   const data = await response.json();
   if (!response.ok || !data.success) {
-    throw new Error(data.error || data.message || 'Failed to send test push notification');
+    const errorMsg = data.error || data.message || 'Failed to send test push notification';
+    // If mismatch or unregistered token detected, auto refresh token and retry once!
+    if (autoRetryOnMismatch && (errorMsg.includes('mismatched-credential') || errorMsg.includes('SENDER_ID_MISMATCH') || errorMsg.includes('NotRegistered') || errorMsg.includes('UNREGISTERED'))) {
+      console.warn('[FCM] Token mismatch detected. Auto-refreshing fresh token and retrying...');
+      const freshToken = await refreshNotificationToken(userType);
+      if (freshToken) {
+        return sendTestPushNotification(userType, freshToken, false);
+      }
+    }
+    throw new Error(errorMsg);
   }
 
   return data;
@@ -309,6 +345,7 @@ async function sendTestPushNotification(userType = 'user') {
 export {
   initializePushNotifications,
   registerFCMToken,
+  refreshNotificationToken,
   removeFCMToken,
   setupForegroundNotificationHandler,
   requestNotificationPermission,

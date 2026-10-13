@@ -371,19 +371,16 @@ const logout = async (req, res) => {
     // Clear FCM tokens based on platform/token and reset session
     const userId = req.user && (req.user.id || req.user._id);
     if (userId) {
-      let updateQuery;
+      let updateQuery = {};
       if (token) {
         updateQuery = platform === 'mobile'
-          ? { $pull: { fcmTokenMobile: token }, loginSessionId: null }
-          : { $pull: { fcmTokens: token }, loginSessionId: null };
-      } else {
-        updateQuery = platform === 'mobile'
-          ? { $set: { fcmTokenMobile: [], loginSessionId: null } }
-          : { $set: { fcmTokens: [], loginSessionId: null } };
+          ? { $pull: { fcmTokenMobile: token } }
+          : { $pull: { fcmTokens: token } };
       }
-
-      await User.findByIdAndUpdate(userId, updateQuery);
-      console.log(`[AUTH] ✅ ${platform} session & tokens cleared for user: ${userId}`);
+      if (Object.keys(updateQuery).length > 0) {
+        await User.findByIdAndUpdate(userId, updateQuery);
+      }
+      console.log(`[AUTH] ✅ ${platform} session & token cleared for user: ${userId}`);
     }
 
     res.status(200).json({

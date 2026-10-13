@@ -43,10 +43,7 @@ const authenticate = async (req, res, next) => {
     switch (decoded.role) {
       case USER_ROLES.USER:
         user = await User.findById(decoded.userId).select('-password').lean();
-        // SINGLE DEVICE LOGOUT Logic
-        if (user && user.loginSessionId && decoded.loginSessionId && user.loginSessionId !== decoded.loginSessionId) {
-          return res.status(401).json({ success: false, message: 'Account logged in on another device. Please login again.' });
-        }
+        // Allow multi-device concurrent sessions (e.g. mobile web + desktop web)
         break;
       case USER_ROLES.VENDOR:
         user = await Vendor.findById(decoded.userId).select('-password').lean();

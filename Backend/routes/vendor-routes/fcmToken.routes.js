@@ -148,33 +148,62 @@ router.delete('/remove-all', authenticate, async (req, res) => {
 router.post('/test', authenticate, async (req, res) => {
   try {
     const vendorId = req.user._id;
-    const vendor = await Vendor.findById(vendorId);
+    const { token: clientToken } = req.body;
+    let vendor = await Vendor.findById(vendorId);
 
     if (!vendor) {
       return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
 
-    const tokens = [...(vendor.fcmTokens || []), ...(vendor.fcmTokenMobile || [])];
-    const uniqueTokens = [...new Set(tokens)];
+    let targetTokens = [];
+    if (clientToken && typeof clientToken === 'string' && clientToken.trim()) {
+      const cleanToken = clientToken.trim();
+      targetTokens = [cleanToken];
 
-    if (uniqueTokens.length === 0) {
+      if (!vendor.fcmTokens?.includes(cleanToken)) {
+        vendor = await Vendor.findByIdAndUpdate(
+          vendorId,
+          { $addToSet: { fcmTokens: cleanToken } },
+          { new: true }
+        );
+      }
+    } else {
+      const tokens = [...(vendor.fcmTokens || []), ...(vendor.fcmTokenMobile || [])];
+      targetTokens = [...new Set(tokens.filter(Boolean))];
+    }
+
+    if (targetTokens.length === 0) {
       return res.status(400).json({ success: false, error: 'No FCM tokens found for vendor. Please allow notifications in browser first.' });
     }
 
-    const response = await sendPushNotification(uniqueTokens, {
+    const response = await sendPushNotification(targetTokens, {
       title: '🔔 Test Notification',
       body: 'Hello Vendor! This is a test push notification from Apna Market 🚀',
+      icon: '/apna-market-icon.png',
       data: {
         type: 'test',
         link: '/vendor/profile'
       }
     });
 
+    if (response.successCount === 0) {
+      const firstError = response.responses?.find(r => !r.success)?.error;
+      const code = firstError?.code || 'delivery-failed';
+      const msg = firstError?.message || 'Push service rejected notification';
+      return res.status(400).json({
+        success: false,
+        error: `Notification delivery failed: [${code}] ${msg}`,
+        errorCode: code,
+        failureCount: response.failureCount
+      });
+    }
+
     res.json({
       success: true,
-      message: 'Test notification sent',
+      message: 'Test notification sent successfully to this device!',
       successCount: response.successCount,
-      failureCount: response.failureCount
+      failureCount: response.failureCount,
+      totalRegisteredTokens: (vendor.fcmTokens || []).length
     });
   } catch (error) {
     console.error('Error sending test notification:', error);
