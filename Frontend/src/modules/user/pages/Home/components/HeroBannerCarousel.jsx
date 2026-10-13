@@ -115,10 +115,15 @@ export const DEFAULT_HERO_BANNERS = [
 
 const HeroBannerCarousel = ({ banners = [] }) => {
   const navigate = useNavigate();
+  const containerRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const touchStartXRef = useRef(0);
-  const touchEndXRef = useRef(0);
+
+  // Mouse & Touch Drag tracking
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const dragDistanceRef = useRef(0);
 
   // Combine backend seeded banners with default fallback styles
   const activeBanners = (banners && banners.length > 0)
@@ -145,48 +150,101 @@ const HeroBannerCarousel = ({ banners = [] }) => {
 
   const total = activeBanners.length;
 
+  // Scroll to a specific slide smoothly
+  const scrollToSlide = useCallback((index) => {
+    if (!containerRef.current) return;
+    const width = containerRef.current.clientWidth;
+    containerRef.current.scrollTo({
+      left: index * width,
+      behavior: 'smooth'
+    });
+    setCurrentIndex(index);
+  }, []);
+
   const handleNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % total);
-  }, [total]);
+    const nextIdx = (currentIndex + 1) % total;
+    scrollToSlide(nextIdx);
+  }, [currentIndex, total, scrollToSlide]);
 
   const handlePrev = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + total) % total);
-  }, [total]);
+    const prevIdx = (currentIndex - 1 + total) % total;
+    scrollToSlide(prevIdx);
+  }, [currentIndex, total, scrollToSlide]);
+
+  // Update currentIndex on scroll (smooth detection for real-time dots update)
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollLeft, clientWidth } = containerRef.current;
+    if (clientWidth === 0) return;
+    const newIndex = Math.round(scrollLeft / clientWidth);
+    if (newIndex >= 0 && newIndex < total && newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+    }
+  };
 
   // Auto-scroll loop functionality (4.5s)
   useEffect(() => {
     if (isPaused || total <= 1) return;
 
     const timer = setInterval(() => {
-      handleNext();
+      if (!isDraggingRef.current && containerRef.current) {
+        const nextIdx = (currentIndex + 1) % total;
+        scrollToSlide(nextIdx);
+      }
     }, 4500);
 
     return () => clearInterval(timer);
-  }, [isPaused, total, handleNext]);
+  }, [isPaused, total, currentIndex, scrollToSlide]);
 
-  // Touch swipe handling for mobile
-  const handleTouchStart = (e) => {
-    touchStartXRef.current = e.targetTouches[0].clientX;
+  // Recalculate scroll on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth;
+        containerRef.current.scrollLeft = currentIndex * width;
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentIndex]);
+
+  // Mouse Drag handlers for desktop slide
+  const handleMouseDown = (e) => {
+    if (!containerRef.current) return;
+    isDraggingRef.current = true;
+    dragDistanceRef.current = 0;
+    startXRef.current = e.pageX - containerRef.current.offsetLeft;
+    scrollLeftRef.current = containerRef.current.scrollLeft;
+    setIsPaused(true);
   };
 
-  const handleTouchMove = (e) => {
-    touchEndXRef.current = e.targetTouches[0].clientX;
+  const handleMouseMove = (e) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.2;
+    dragDistanceRef.current = Math.abs(x - startXRef.current);
+    containerRef.current.scrollLeft = scrollLeftRef.current - walk;
   };
 
-  const handleTouchEnd = () => {
-    if (!touchStartXRef.current || !touchEndXRef.current) return;
-    const diff = touchStartXRef.current - touchEndXRef.current;
-    // Minimum 40px drag distance to trigger slide
-    if (diff > 40) {
-      handleNext();
-    } else if (diff < -40) {
-      handlePrev();
+  const handleMouseUpOrLeave = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsPaused(false);
+
+    if (containerRef.current) {
+      const { scrollLeft, clientWidth } = containerRef.current;
+      const targetIndex = Math.round(scrollLeft / clientWidth);
+      scrollToSlide(Math.max(0, Math.min(total - 1, targetIndex)));
     }
-    touchStartXRef.current = 0;
-    touchEndXRef.current = 0;
   };
 
+  // Handle banner click (distinguish drag from click)
   const handleBannerClick = (banner) => {
+    if (dragDistanceRef.current > 8) {
+      // User was dragging to slide, cancel navigation
+      return;
+    }
     if (banner.slug) {
       navigate(`/user/category/${banner.slug}`);
     } else {
@@ -194,80 +252,103 @@ const HeroBannerCarousel = ({ banners = [] }) => {
     }
   };
 
-  const currentBanner = activeBanners[currentIndex] || activeBanners[0];
-  const IconComponent = currentBanner.categoryIcon || FiCompass;
-
   return (
     <div
       className="relative w-full group select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
-      {/* Main Banner Slide Container */}
+      {/* Horizontal Sliding Carousel Track */}
       <div
-        onClick={() => handleBannerClick(currentBanner)}
-        className={`relative rounded-3xl bg-gradient-to-r ${currentBanner.bgGradient} text-white overflow-hidden p-5 sm:p-7 shadow-lg shadow-black/15 flex items-center justify-between gap-4 cursor-pointer transition-all duration-500 active:scale-[0.99]`}
+        ref={containerRef}
+        onScroll={handleScroll}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => {
+          setTimeout(() => setIsPaused(false), 2000);
+        }}
+        className="flex w-full overflow-x-auto snap-x snap-mandatory scroll-smooth cursor-grab active:cursor-grabbing no-scrollbar rounded-3xl"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}
       >
-        {/* Dynamic Ambient Background Glows */}
-        <div
-          className={`absolute -right-8 -top-8 w-60 h-60 ${currentBanner.ambientGlow} rounded-full blur-2xl pointer-events-none transition-all duration-700`}
-        />
-        <div
-          className={`absolute right-10 bottom-0 w-48 h-48 ${currentBanner.ambientGlow2} rounded-full blur-2xl pointer-events-none transition-all duration-700`}
-        />
-
-        {/* Left Column Text Content */}
-        <div className="relative z-10 max-w-[65%] sm:max-w-[70%] flex flex-col justify-between space-y-2 sm:space-y-3">
-          <div>
-            {/* Badge */}
+        {activeBanners.map((banner, idx) => {
+          const IconComponent = banner.categoryIcon || FiCompass;
+          return (
             <div
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full ${currentBanner.badgeBg} text-[10px] sm:text-xs font-bold mb-1.5 backdrop-blur-xs`}
+              key={banner.id || idx}
+              onClick={() => handleBannerClick(banner)}
+              className="w-full min-w-full shrink-0 snap-center"
             >
-              <IconComponent className="w-3.5 h-3.5" />
-              <span>{currentBanner.badge || 'Discover Near You'}</span>
+              {/* Main Banner Slide Container */}
+              <div
+                className={`relative rounded-3xl bg-gradient-to-r ${banner.bgGradient} text-white overflow-hidden p-5 sm:p-7 shadow-lg shadow-black/15 flex items-center justify-between gap-4 cursor-pointer transition-transform duration-200 active:scale-[0.99] select-none`}
+              >
+                {/* Dynamic Ambient Background Glows */}
+                <div
+                  className={`absolute -right-8 -top-8 w-60 h-60 ${banner.ambientGlow} rounded-full blur-2xl pointer-events-none transition-all duration-700`}
+                />
+                <div
+                  className={`absolute right-10 bottom-0 w-48 h-48 ${banner.ambientGlow2} rounded-full blur-2xl pointer-events-none transition-all duration-700`}
+                />
+
+                {/* Left Column Text Content */}
+                <div className="relative z-10 max-w-[65%] sm:max-w-[70%] flex flex-col justify-between space-y-2 sm:space-y-3">
+                  <div>
+                    {/* Badge */}
+                    <div
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full ${banner.badgeBg} text-[10px] sm:text-xs font-bold mb-1.5 backdrop-blur-xs`}
+                    >
+                      <IconComponent className="w-3.5 h-3.5" />
+                      <span>{banner.badge || 'Discover Near You'}</span>
+                    </div>
+
+                    {/* Banner Title & Highlight */}
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-[1.15] drop-shadow-xs">
+                      {banner.title} <br className="sm:hidden" />
+                      <span className={banner.accentColor || 'text-emerald-200'}>
+                        {banner.highlightText ? ` ${banner.highlightText}` : ''}
+                      </span>
+                    </h2>
+
+                    {/* Subtitle / Description */}
+                    <p className="text-[11px] sm:text-sm text-white/85 mt-1 font-medium leading-tight line-clamp-2">
+                      {banner.subtitle}
+                    </p>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="pt-1">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white text-[11px] sm:text-xs font-bold transition-all w-fit backdrop-blur-md border border-white/25 shadow-xs">
+                      <span>{banner.buttonText || 'Explore Now'}</span>
+                      <FiArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Column Visual Image */}
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 shrink-0 z-10">
+                  <div className="w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl border-2 border-white/20 group-hover:scale-105 transition-all duration-300 bg-black/10">
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title}
+                      className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none"
+                      draggable={false}
+                      onError={(e) => {
+                        e.target.src = '/tasty-food-banner.jpg';
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-
-            {/* Banner Title & Highlight */}
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-[1.15] drop-shadow-xs">
-              {currentBanner.title} <br className="sm:hidden" />
-              <span className={currentBanner.accentColor || 'text-emerald-200'}>
-                {currentBanner.highlightText ? ` ${currentBanner.highlightText}` : ''}
-              </span>
-            </h2>
-
-            {/* Subtitle / Description */}
-            <p className="text-[11px] sm:text-sm text-white/85 mt-1 font-medium leading-tight line-clamp-2">
-              {currentBanner.subtitle}
-            </p>
-          </div>
-
-          {/* Action Button */}
-          <div className="pt-1">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/15 group-hover:bg-white/25 active:scale-95 text-white text-[11px] sm:text-xs font-bold transition-all w-fit backdrop-blur-md border border-white/25 shadow-xs">
-              <span>{currentBanner.buttonText || 'Explore Now'}</span>
-              <FiArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </span>
-          </div>
-        </div>
-
-        {/* Right Column Visual Image */}
-        <div className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 shrink-0 z-10">
-          <div className="w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl border-2 border-white/20 group-hover:scale-105 transition-all duration-300 bg-black/10">
-            <img
-              src={currentBanner.imageUrl}
-              alt={currentBanner.title}
-              key={currentBanner.imageUrl}
-              className="w-full h-full object-cover transition-opacity duration-300"
-              onError={(e) => {
-                // Fallback to placeholder if external URL fails
-                e.target.src = '/tasty-food-banner.jpg';
-              }}
-            />
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Navigation Arrows (Visible on hover for desktop) */}
@@ -279,7 +360,7 @@ const HeroBannerCarousel = ({ banners = [] }) => {
               e.stopPropagation();
               handlePrev();
             }}
-            className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 -mt-2 w-8 h-8 rounded-full bg-black/35 hover:bg-black/55 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
             aria-label="Previous banner"
           >
             <FiChevronLeft className="w-4 h-4" />
@@ -290,7 +371,7 @@ const HeroBannerCarousel = ({ banners = [] }) => {
               e.stopPropagation();
               handleNext();
             }}
-            className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 -mt-2 w-8 h-8 rounded-full bg-black/35 hover:bg-black/55 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 z-20 cursor-pointer shadow-md"
             aria-label="Next banner"
           >
             <FiChevronRight className="w-4 h-4" />
@@ -298,7 +379,7 @@ const HeroBannerCarousel = ({ banners = [] }) => {
         </>
       )}
 
-      {/* Pagination Dot Indicators */}
+      {/* Pagination Dot Indicators (Matches Screen exactly) */}
       {total > 1 && (
         <div className="flex items-center justify-center gap-1.5 mt-2.5">
           {activeBanners.map((_, dotIdx) => (
@@ -307,9 +388,9 @@ const HeroBannerCarousel = ({ banners = [] }) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setCurrentIndex(dotIdx);
+                scrollToSlide(dotIdx);
               }}
-              className={`transition-all duration-300 rounded-full ${
+              className={`transition-all duration-300 rounded-full cursor-pointer ${
                 dotIdx === currentIndex
                   ? 'w-6 h-1.5 bg-[#016A54]'
                   : 'w-1.5 h-1.5 bg-neutral-300 hover:bg-neutral-400'
