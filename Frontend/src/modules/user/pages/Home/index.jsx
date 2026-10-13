@@ -99,7 +99,7 @@ const Home = () => {
           setHasMore(totalPages > 1 && fetched.length >= 24);
         }
       } catch (err) {
-        console.error('Error fetching home discovery data:', err);
+        console.error('Errors fetching home discovery data:', err);
       } finally {
         if (!cancelled) setLoading(false);
       }
