@@ -285,7 +285,7 @@ const VendorSignup = () => {
   useEffect(() => {
     const fetchCats = async () => {
       try {
-        const res = await publicCatalogService.getCategories();
+        const res = await publicCatalogService.getCategories(null, true);
         if (res?.categories && res.categories.length > 0) {
           const fetched = res.categories.map((c, i) => {
             const fallbackCat = DEFAULT_MARKET_CATEGORIES.find((def) => {
@@ -308,20 +308,16 @@ const VendorSignup = () => {
           });
           setCategories(fetched);
 
-          // Normalize any previously saved selectedServices & activeTabCategory to fetched titles
+          // Normalize any previously saved category to single selection
           setSelectedServices((prev) => {
             if (!prev || prev.length === 0) return [fetched[0].title];
-            const mapped = prev.map((sTitle) => {
-              const matched = fetched.find((fc) => {
-                const fLow = fc.title.toLowerCase().trim();
-                const sLow = sTitle.toLowerCase().trim();
-                return fLow === sLow || fLow.includes(sLow) || sLow.includes(fLow);
-              });
-              return matched ? matched.title : sTitle;
+            const firstTitle = Array.isArray(prev) ? prev[0] : prev;
+            const matched = fetched.find((fc) => {
+              const fLow = fc.title.toLowerCase().trim();
+              const sLow = String(firstTitle || '').toLowerCase().trim();
+              return fLow === sLow || fLow.includes(sLow) || sLow.includes(fLow);
             });
-            const validTitles = fetched.map(f => f.title);
-            const cleaned = [...new Set(mapped)].filter(t => validTitles.includes(t));
-            return cleaned.length > 0 ? cleaned : [fetched[0].title];
+            return [matched ? matched.title : fetched[0].title];
           });
 
           setActiveTabCategory((prevTab) => {
@@ -407,29 +403,16 @@ const VendorSignup = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp]);
 
-  // Toggle Category selection (Multi-select)
-  const toggleCategorySelection = (catTitle) => {
-    if (selectedServices.includes(catTitle)) {
-      if (selectedServices.length === 1) {
-        toast.error('Please select at least 1 category');
-        return;
-      }
-      const updated = selectedServices.filter((s) => s !== catTitle);
-      setSelectedServices(updated);
-      if (activeTabCategory === catTitle) {
-        setActiveTabCategory(updated[0]);
-      }
-    } else {
-      const updated = [...selectedServices, catTitle];
-      setSelectedServices(updated);
-      setActiveTabCategory(catTitle);
-      // Initialize default form details for new category if missing
-      if (!serviceDetailsMap[catTitle]) {
-        setServiceDetailsMap((prev) => ({
-          ...prev,
-          [catTitle]: getDefaultDetailsForCategory(catTitle)
-        }));
-      }
+  // Select Category (Single-select: exactly 1 category per vendor)
+  const handleSelectCategory = (catTitle) => {
+    setSelectedServices([catTitle]);
+    setActiveTabCategory(catTitle);
+    // Initialize default form details for new category if missing
+    if (!serviceDetailsMap[catTitle]) {
+      setServiceDetailsMap((prev) => ({
+        ...prev,
+        [catTitle]: getDefaultDetailsForCategory(catTitle)
+      }));
     }
   };
 
@@ -534,6 +517,11 @@ const VendorSignup = () => {
     const profilePhotoDoc = documentPreview.profilePhoto || formData.documents.find((d) => d.type === 'profilePhoto')?.url || null;
     const otherDocs = formData.documents.filter((d) => d.type === 'other').map((d) => d.url).filter(Boolean);
 
+    const chosenCategory = selectedServices[0] || activeTabCategory || 'Shops';
+    const singleCategoryDetails = {
+      [chosenCategory]: serviceDetailsMap[chosenCategory] || {}
+    };
+
     return {
       name: formData.name.trim(),
       email: formData.email.trim(),
@@ -553,10 +541,13 @@ const VendorSignup = () => {
       } : undefined,
       aadhar: formData.aadhar,
       pan: formData.pan,
-      service: selectedServices,
-      services: selectedServices,
-      serviceDetails: serviceDetailsMap,
-      dynamicFormAnswers: serviceDetailsMap,
+      service: [chosenCategory],
+      services: [chosenCategory],
+      primaryService: chosenCategory,
+      category: chosenCategory,
+      categories: [chosenCategory],
+      serviceDetails: singleCategoryDetails,
+      dynamicFormAnswers: singleCategoryDetails,
       aadharDocument: aadharDoc,
       aadharBackDocument: aadharBackDoc,
       panDocument: panDoc,
@@ -631,36 +622,37 @@ const VendorSignup = () => {
   };
 
   const goNextFromServices = () => {
-    if (!selectedServices || selectedServices.length === 0) {
-      toast.error('Please select at least one category');
+    const chosenCategory = selectedServices[0] || activeTabCategory;
+    if (!chosenCategory) {
+      toast.error('Please select a category for your shop');
       return;
     }
 
-    // Validate required fields for all selected categories
-    for (const catTitle of selectedServices) {
-      const catObj = categories.find((c) => {
+    // Validate required fields for the chosen category
+    const catObj =
+      categories.find((c) => (c.title || '').toLowerCase().trim() === (chosenCategory || '').toLowerCase().trim()) ||
+      categories.find((c) => c.id === chosenCategory || (c._id && String(c._id) === chosenCategory)) ||
+      categories.find((c) => {
         const cLow = (c.title || '').toLowerCase().trim();
-        const sLow = catTitle.toLowerCase().trim();
+        const sLow = chosenCategory.toLowerCase().trim();
         return cLow === sLow || cLow.includes(sLow) || sLow.includes(cLow);
       });
 
-      const schema = catObj?.vendorFormSchema || [];
-      const answers = serviceDetailsMap[catTitle] || serviceDetailsMap[catObj?.title] || {};
+    const schema = catObj?.vendorFormSchema || [];
+    const answers = serviceDetailsMap[chosenCategory] || serviceDetailsMap[catObj?.title] || {};
 
-      for (const field of schema) {
-        if (field.required) {
-          const val = answers[field.key];
-          const isEmpty =
-            val === undefined ||
-            val === null ||
-            (typeof val === 'string' && val.trim() === '') ||
-            (Array.isArray(val) && val.length === 0);
+    for (const field of schema) {
+      if (field.required) {
+        const val = answers[field.key];
+        const isEmpty =
+          val === undefined ||
+          val === null ||
+          (typeof val === 'string' && val.trim() === '') ||
+          (Array.isArray(val) && val.length === 0);
 
-          if (isEmpty) {
-            setActiveTabCategory(catTitle);
-            toast.error(`Please fill "${field.label}" for ${catTitle}`);
-            return;
-          }
+        if (isEmpty) {
+          toast.error(`Please fill "${field.label}" for ${chosenCategory}`);
+          return;
         }
       }
     }
@@ -812,21 +804,45 @@ const VendorSignup = () => {
     `Your provider account is under review by ${appName} admin team`,
   ];
 
+  const parseFieldOptions = (options) => {
+    if (!options) return [];
+    const list = Array.isArray(options)
+      ? options
+      : typeof options === 'string'
+        ? options.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+    return list
+      .map((opt) => {
+        if (typeof opt === 'object' && opt !== null) {
+          const val = opt.value !== undefined ? String(opt.value) : (opt.label || '');
+          const lbl = opt.label || opt.value || '';
+          return { label: lbl, value: val };
+        }
+        const str = String(opt).trim();
+        return { label: str, value: str };
+      })
+      .filter((o) => o.label || o.value);
+  };
+
   const renderServiceSpecificForm = (catTitle) => {
     if (!catTitle) return null;
     const targetLow = catTitle.toLowerCase().trim();
     const cleanTarget = targetLow.replace(/ booking$/, '').replace(/ service$/, '');
 
-    const catObj = categories.find((c) => {
-      const cLow = (c.title || '').toLowerCase().trim();
-      const cleanCLow = cLow.replace(/ booking$/, '').replace(/ service$/, '');
-      return (
-        cLow === targetLow ||
-        cleanCLow === cleanTarget ||
-        cLow.includes(cleanTarget) ||
-        targetLow.includes(cleanCLow)
-      );
-    });
+    // 1. Exact match by title or ID (guarantees exact admin category)
+    const catObj =
+      categories.find((c) => (c.title || '').toLowerCase().trim() === targetLow) ||
+      categories.find((c) => c.id === catTitle || (c._id && String(c._id) === catTitle)) ||
+      categories.find((c) => {
+        const cLow = (c.title || '').toLowerCase().trim();
+        const cleanCLow = cLow.replace(/ booking$/, '').replace(/ service$/, '');
+        return (
+          cLow === targetLow ||
+          cleanCLow === cleanTarget ||
+          cLow.includes(cleanTarget) ||
+          targetLow.includes(cleanCLow)
+        );
+      });
 
     const schema = catObj?.vendorFormSchema || [];
     const details = serviceDetailsMap[catTitle] || serviceDetailsMap[catObj?.title] || {};
@@ -838,6 +854,7 @@ const VendorSignup = () => {
             .sort((a, b) => (a.order || 0) - (b.order || 0))
             .map((field) => {
               const val = details[field.key] !== undefined ? details[field.key] : '';
+              const fieldOptions = parseFieldOptions(field.options);
 
               if (field.type === 'select') {
                 return (
@@ -852,8 +869,10 @@ const VendorSignup = () => {
                       className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-primary-400 outline-none"
                     >
                       <option value="">Select Option...</option>
-                      {(field.options || []).map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
+                      {fieldOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -863,7 +882,9 @@ const VendorSignup = () => {
               if (field.type === 'multiselect') {
                 const currentArr = Array.isArray(val)
                   ? val
-                  : typeof val === 'string' && val ? val.split(', ') : [];
+                  : typeof val === 'string' && val
+                    ? val.split(',').map((s) => s.trim()).filter(Boolean)
+                    : [];
                 return (
                   <div key={field.key}>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -871,16 +892,16 @@ const VendorSignup = () => {
                     </label>
                     {field.helpText && <p className="text-[10px] text-slate-400 mb-1">{field.helpText}</p>}
                     <div className="flex flex-wrap gap-1.5">
-                      {(field.options || []).map((opt) => {
-                        const isSel = currentArr.includes(opt);
+                      {fieldOptions.map((opt) => {
+                        const isSel = currentArr.includes(opt.value) || currentArr.includes(opt.label);
                         return (
                           <button
-                            key={opt}
+                            key={opt.value}
                             type="button"
                             onClick={() => {
                               const updated = isSel
-                                ? currentArr.filter((v) => v !== opt)
-                                : [...currentArr, opt];
+                                ? currentArr.filter((v) => v !== opt.value && v !== opt.label)
+                                : [...currentArr, opt.value];
                               updateServiceDetailField(catTitle, field.key, updated.join(', '));
                             }}
                             className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
@@ -889,7 +910,8 @@ const VendorSignup = () => {
                                 : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                             }`}
                           >
-                            {isSel && <FiCheck className="inline mr-1 text-xs" />}{opt}
+                            {isSel && <FiCheck className="inline mr-1 text-xs" />}
+                            {opt.label}
                           </button>
                         );
                       })}
@@ -976,6 +998,8 @@ const VendorSignup = () => {
                   key={field.key}
                   label={`${field.label}${field.required ? ' *' : ''}`}
                   type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'time' ? 'time' : 'text'}
+                  min={field.type === 'number' && field.minValue !== null && field.minValue !== undefined ? field.minValue : undefined}
+                  max={field.type === 'number' && field.maxValue !== null && field.maxValue !== undefined ? field.maxValue : undefined}
                   value={val}
                   onChange={(e) => updateServiceDetailField(catTitle, field.key, e.target.value)}
                   placeholder={field.helpText || `Enter ${field.label.toLowerCase()}`}
@@ -1232,9 +1256,9 @@ const VendorSignup = () => {
               <FiLayers className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Select Categories You Offer</h4>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Select Your Shop Category</h4>
               <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed">
-                Choose one or more business categories. For each category, fill out the custom dynamic form created by the admin.
+                Choose the primary category for your shop/business (1 category per vendor account). Fill out the required form below.
               </p>
             </div>
           </div>
@@ -1243,22 +1267,22 @@ const VendorSignup = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Available Categories ({categories.length})
+                Select Your Category ({categories.length})
               </label>
-              <span className="text-[11px] font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-100">
-                {selectedServices.length} Selected
+              <span className="text-[11px] font-bold text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-full border border-primary-200">
+                1 Category per Vendor
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {categories.map((cat) => {
-                const isSelected = selectedServices.includes(cat.title);
+                const isSelected = (selectedServices[0] || activeTabCategory) === cat.title;
                 const imageSrc = cat.imageUrl || cat.homeIconUrl || cat.icon;
                 return (
                   <button
                     key={cat.id || cat.title}
                     type="button"
-                    onClick={() => toggleCategorySelection(cat.title)}
+                    onClick={() => handleSelectCategory(cat.title)}
                     className={`relative p-2.5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between group overflow-hidden ${
                       isSelected
                         ? 'border-primary-500 bg-primary-50/50 shadow-sm ring-2 ring-primary-400/30'
@@ -1301,39 +1325,7 @@ const VendorSignup = () => {
             </div>
           </div>
 
-          {/* If multiple categories selected, Category Tab Switcher */}
-          {selectedServices.length > 1 && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  Fill Details For:
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">Switch tabs to complete each category</span>
-              </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                {selectedServices.map((catTitle) => {
-                  const isActive = activeTabCategory === catTitle;
-                  return (
-                    <button
-                      key={catTitle}
-                      type="button"
-                      onClick={() => setActiveTabCategory(catTitle)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                        isActive
-                          ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/25'
-                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span>{catTitle}</span>
-                      {isActive && <FiCheck className="w-3 h-3" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Dynamic Form for Active Category */}
+          {/* Dynamic Form for Selected Category */}
           {activeTabCategory && (
             <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1343,16 +1335,16 @@ const VendorSignup = () => {
                   </div>
                   <div>
                     <h3 className="text-xs font-black text-slate-900 leading-none">
-                      {activeTabCategory} Requirements
+                      {activeTabCategory} Details & Requirements
                     </h3>
                     <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                      Admin-configured form schema for this category
+                      Fill out the shop details for {activeTabCategory}
                     </p>
                   </div>
                 </div>
 
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Dynamic Form
+                  Required Form
                 </span>
               </div>
 

@@ -6,7 +6,7 @@ import CitySelectorModal from './CitySelectorModal';
 
 const TopHeader = ({ unreadNotifications = 3 }) => {
   const navigate = useNavigate();
-  const { currentCity, userLocation } = useCity();
+  const { currentCity, userLocation, isDetectingLocation } = useCity();
   const [user, setUser] = useState(null);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
@@ -19,10 +19,12 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
     }
   }, []);
 
-  const displayLocation = userLocation?.addressName ||
-    (currentCity?.name ? `${currentCity.name}, Madhya Pradesh` : 'Indore, Madhya Pradesh');
+  const displayLocation = isDetectingLocation
+    ? 'Detecting your location...'
+    : (userLocation?.addressName ||
+      (currentCity?.name ? `${currentCity.name}, Madhya Pradesh` : 'Indore, Madhya Pradesh'));
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : null;
-  const isGps = userLocation?.source === 'gps';
+  const isLiveLocation = userLocation?.source === 'gps' || userLocation?.source === 'map_api';
 
   return (
     <>
@@ -36,24 +38,37 @@ const TopHeader = ({ unreadNotifications = 3 }) => {
             aria-label="Change location & address"
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-xs transition-all ${
-              isGps 
-                ? 'bg-emerald-600 text-white'
-                : 'bg-[#EDF8F5] text-[#016A54] group-hover:bg-[#D5EFEB]'
+              isDetectingLocation
+                ? 'bg-emerald-100 text-[#016A54] ring-2 ring-emerald-400/40'
+                : (isLiveLocation 
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-[#EDF8F5] text-[#016A54] group-hover:bg-[#D5EFEB]')
             }`}>
-              {isGps ? <FiNavigation className="w-4 h-4" /> : <FiMapPin className="w-4 h-4 text-[#016A54]" />}
+              {isDetectingLocation ? (
+                <FiNavigation className="w-4 h-4 animate-spin text-[#016A54]" />
+              ) : isLiveLocation ? (
+                <FiNavigation className="w-4 h-4" />
+              ) : (
+                <FiMapPin className="w-4 h-4 text-[#016A54]" />
+              )}
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 leading-none flex items-center gap-1">
                 <span>Location</span>
-                {isGps && (
+                {isDetectingLocation && (
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded font-black animate-pulse">FETCHING</span>
+                )}
+                {!isDetectingLocation && isLiveLocation && (
                   <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">GPS</span>
                 )}
-                {userLocation?.source === 'saved_address' && (
+                {!isDetectingLocation && userLocation?.source === 'saved_address' && (
                   <span className="text-[9px] bg-sky-100 text-sky-800 px-1 rounded font-black">SAVED</span>
                 )}
               </span>
               <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-xs sm:text-sm font-extrabold text-[#102030] truncate">
+                <span className={`text-xs sm:text-sm font-extrabold truncate ${
+                  isDetectingLocation ? 'text-emerald-700 animate-pulse' : 'text-[#102030]'
+                }`}>
                   {displayLocation}
                 </span>
                 <FiChevronDown className="w-3.5 h-3.5 text-neutral-500 group-hover:translate-y-0.5 transition-transform shrink-0" />

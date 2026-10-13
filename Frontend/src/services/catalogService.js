@@ -268,13 +268,15 @@ const inFlightCategoriesPromises = {};
  * Now with caching and request deduplication for faster data retrieval
  */
 export const publicCatalogService = {
-  // Get all active categories (cached for 5 minutes with request deduplication)
-  getCategories: async (cityId) => {
+  // Get all active categories (cached for 5 minutes with request deduplication, optional forceFresh)
+  getCategories: async (cityId, forceFresh = false) => {
     const cacheKey = `public:categories:${cityId || 'default'}`;
-    const cached = apiCache.get(cacheKey);
-    if (cached) return cached;
+    if (!forceFresh) {
+      const cached = apiCache.get(cacheKey);
+      if (cached) return cached;
+    }
 
-    if (inFlightCategoriesPromises[cacheKey]) {
+    if (!forceFresh && inFlightCategoriesPromises[cacheKey]) {
       return inFlightCategoriesPromises[cacheKey];
     }
 

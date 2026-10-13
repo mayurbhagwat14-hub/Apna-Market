@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { DEFAULT_USER_LOCATION } from '../utils/distance';
+import flutterBridge from '../utils/flutterBridge';
+import { reverseGeocodeCoords, fetchLocationViaMapApi } from '../utils/reverseGeocode';
 
 const CityContext = createContext();
 
@@ -153,41 +155,84 @@ export const CityProvider = ({ children }) => {
     }
   };
 
-  // Detect current location using browser GPS
-  const detectCurrentLocation = useCallback(() => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your browser'));
-        return;
+  // Detect current location:
+  //   Step 1: Get EXACT coordinates via device GPS (navigator.geolocation)
+  //   Step 2: Convert coordinates to readable address via Google Maps Geocoding API
+  const detectCurrentLocation = useCallback(async () => {
+    setIsDetectingLocation(true);
+    try {
+      // 1. Get EXACT coordinates from device GPS sensor
+      const gpsCoords = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by your browser'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+          },
+          (error) => {
+            reject(error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 30000
+          }
+        );
+      });
+
+      const lat = gpsCoords.latitude;
+      const lng = gpsCoords.longitude;
+
+      if (!lat || !lng) {
+        throw new Error('Unable to retrieve GPS coordinates.');
       }
 
-      setIsDetectingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setIsDetectingLocation(false);
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const cityName = currentCity?.name || 'Indore';
-          const newLoc = {
-            lat,
-            lng,
-            cityName,
-            addressName: `Current Location (${cityName})`,
-            source: 'gps'
-          };
-          setUserLocation(newLoc);
-          localStorage.setItem('apna_user_location', JSON.stringify(newLoc));
-          resolve(newLoc);
-        },
-        (error) => {
-          setIsDetectingLocation(false);
-          console.warn('Geolocation permission error or timeout:', error);
-          reject(error);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-      );
-    });
-  }, [currentCity]);
+      // 2. Convert exact GPS coordinates to readable address via Google Maps Geocoding API
+      const geo = await reverseGeocodeCoords(lat, lng);
+      const detectedCity = geo?.city || currentCity?.name || 'Indore';
+      const addressName = geo?.addressName || `Current Location (${detectedCity})`;
+
+      const newLoc = {
+        lat,
+        lng,
+        cityName: detectedCity,
+        area: geo?.area || '',
+        state: geo?.state || '',
+        pincode: geo?.pincode || '',
+        addressName,
+        fullAddress: geo?.fullAddress || addressName,
+        source: 'gps'
+      };
+
+      setUserLocation(newLoc);
+      localStorage.setItem('apna_user_location', JSON.stringify(newLoc));
+      localStorage.setItem('location_granted', 'true');
+
+      // 3. Match detected city with system cities list if available
+      if (Array.isArray(cities) && cities.length > 0 && detectedCity) {
+        const matched = cities.find(
+          (c) => c.name?.toLowerCase().trim() === detectedCity.toLowerCase().trim()
+        );
+        if (matched) {
+          setCurrentCity(matched);
+          localStorage.setItem('selectedCityId', matched._id || matched.id);
+        }
+      }
+
+      setIsDetectingLocation(false);
+      return { success: true, location: newLoc };
+    } catch (error) {
+      setIsDetectingLocation(false);
+      console.warn('[CityContext] Location detection error:', error?.message || error);
+      throw error;
+    }
+  }, [currentCity, cities]);
 
   // Set explicit coordinates (e.g. from map or address pin)
   const setExplicitLocation = (loc) => {
@@ -198,6 +243,7 @@ export const CityProvider = ({ children }) => {
 
   const value = {
     currentCity,
+    selectedCity: currentCity,
     cities,
     selectCity,
     userLocation,
