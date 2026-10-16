@@ -45,7 +45,7 @@ const getVendorAdPlanById = async (req, res) => {
  */
 const createVendorAdPlan = async (req, res) => {
   try {
-    const { name, tagline, description, price, durationType, durationValue, features, badge, displayOrder } = req.body;
+    const { name, tagline, description, price, durationType, durationValue, features, perks, badge, displayOrder } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Plan name is required' });
@@ -68,6 +68,13 @@ const createVendorAdPlan = async (req, res) => {
       durationType: durationType || 'monthly',
       durationValue: Number(durationValue) || 1,
       features: Array.isArray(features) ? features.filter(f => f.trim()) : [],
+      perks: perks || {
+        featuredOnHome: true,
+        priorityRanking: true,
+        verifiedBadge: true,
+        directContact: true,
+        analyticsAccess: true
+      },
       badge: badge?.trim() || '',
       displayOrder: Number(displayOrder) || 0
     });
@@ -112,6 +119,7 @@ const updateVendorAdPlan = async (req, res) => {
     if (updates.durationType !== undefined) plan.durationType = updates.durationType;
     if (updates.durationValue !== undefined) plan.durationValue = Number(updates.durationValue);
     if (updates.features !== undefined) plan.features = Array.isArray(updates.features) ? updates.features.filter(f => f.trim()) : [];
+    if (updates.perks !== undefined) plan.perks = { ...plan.perks, ...updates.perks };
     if (updates.badge !== undefined) plan.badge = updates.badge.trim();
     if (updates.displayOrder !== undefined) plan.displayOrder = Number(updates.displayOrder);
     if (updates.isActive !== undefined) plan.isActive = Boolean(updates.isActive);
@@ -267,7 +275,9 @@ const grantVendorSubscription = async (req, res) => {
         price: plan.price,
         durationType: plan.durationType,
         durationValue: plan.durationValue,
-        features: plan.features
+        features: plan.features,
+        perks: plan.perks,
+        badge: plan.badge
       },
       startDate,
       endDate,
@@ -293,6 +303,60 @@ const grantVendorSubscription = async (req, res) => {
     });
   } catch (error) {
     console.error('Error granting subscription:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PATCH /api/admin/vendor-subscriptions/:id/cancel
+ * Admin can cancel an active subscription
+ */
+const cancelVendorSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const sub = await VendorSubscription.findById(id);
+    if (!sub) return res.status(404).json({ success: false, message: 'Subscription not found' });
+
+    sub.status = 'CANCELLED';
+    sub.cancelledBy = 'admin';
+    sub.cancelReason = reason || 'Cancelled by admin';
+    sub.cancelledAt = new Date();
+    await sub.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Subscription cancelled successfully',
+      data: sub
+    });
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/admin/vendor-subscriptions/vendors-list
+ * Helper to fetch vendor list for grant subscription modal
+ */
+const getVendorsListForAdmin = async (req, res) => {
+  try {
+    const Vendor = require('../../models/Vendor');
+    const vendors = await Vendor.find({
+      approvalStatus: 'approved',
+      accountStatus: { $nin: ['SUSPENDED', 'BLOCKED'] }
+    })
+      .select('name businessName email phone address')
+      .sort({ businessName: 1, name: 1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: vendors
+    });
+  } catch (error) {
+    console.error('Error fetching vendors list:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -330,5 +394,7 @@ module.exports = {
   toggleVendorAdPlan,
   getAllVendorSubscriptions,
   grantVendorSubscription,
+  cancelVendorSubscription,
+  getVendorsListForAdmin,
   calculateEndDate
 };

@@ -23,6 +23,12 @@ export const vendorSubscriptionService = {
   verifyPayment: async (paymentData) => {
     const response = await api.post('/vendors/subscription/verify-payment', paymentData);
     return response.data;
+  },
+
+  // Test mode activation without payment gateway
+  activateTest: async (planId) => {
+    const response = await api.post('/vendors/subscription/activate-test', { planId });
+    return response.data;
   }
 };
 

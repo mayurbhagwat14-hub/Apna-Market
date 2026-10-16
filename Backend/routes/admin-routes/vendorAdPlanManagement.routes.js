@@ -10,7 +10,9 @@ const {
   deleteVendorAdPlan,
   toggleVendorAdPlan,
   getAllVendorSubscriptions,
-  grantVendorSubscription
+  grantVendorSubscription,
+  cancelVendorSubscription,
+  getVendorsListForAdmin
 } = require('../../controllers/adminControllers/vendorAdPlanController');
 
 // ─── VENDOR AD PLANS (CRUD) ───
@@ -36,7 +38,14 @@ router.patch('/vendor-plans/:id/toggle', authenticate, isAdmin, toggleVendorAdPl
 // GET /api/admin/vendor-subscriptions — View all vendor subscriptions
 router.get('/vendor-subscriptions', authenticate, isAdmin, getAllVendorSubscriptions);
 
+// GET /api/admin/vendor-subscriptions/vendors-list — List vendors for grant modal
+router.get('/vendor-subscriptions/vendors-list', authenticate, isAdmin, getVendorsListForAdmin);
+
 // POST /api/admin/vendor-subscriptions/grant — Admin manually grants a subscription
 router.post('/vendor-subscriptions/grant', authenticate, isAdmin, grantVendorSubscription);
 
+// PATCH /api/admin/vendor-subscriptions/:id/cancel — Admin cancels a subscription
+router.patch('/vendor-subscriptions/:id/cancel', authenticate, isAdmin, cancelVendorSubscription);
+
 module.exports = router;
+

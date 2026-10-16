@@ -347,6 +347,11 @@ const Home = () => {
     return deduplicateShopListings(allListings);
   }, [allListings]);
 
+  // Subscribed & Promoted shops with active marketing subscription
+  const featuredListings = useMemo(() => {
+    return uniqueShops.filter((item) => item.isFeatured || item.isSubscribed || item.promoted);
+  }, [uniqueShops]);
+
   // Closest stores near the user (< 3 km or closest 8 stores), deduplicated by shop
   const nearestListings = useMemo(() => {
     return [...uniqueShops].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999)).slice(0, 8);
@@ -610,6 +615,36 @@ const Home = () => {
             })}
           </div>
         </div>
+
+        {/* 4.5. Featured & Promoted Stores Carousel */}
+        {featuredListings.length > 0 && (
+          <section className="pt-1">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3.5">
+              <div>
+                <h2 className="text-[15px] sm:text-lg font-black text-[#102030] tracking-tight flex items-center gap-1.5">
+                  <span>Featured Partner Stores</span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-2xs">
+                    Promoted
+                  </span>
+                </h2>
+                <p className="text-[11px] text-neutral-500 font-medium">
+                  Verified Apna Market shops offering exclusive products & fast service
+                </p>
+              </div>
+            </div>
+
+            <div className="flex sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+              {featuredListings.map((item) => (
+                <div 
+                  key={`feat-${item._id || item.id}`} 
+                  className="w-[170px] min-w-[170px] max-w-[170px] sm:w-auto sm:min-w-0 sm:max-w-none snap-start shrink-0 sm:shrink"
+                >
+                  <BusinessCard business={item} imageAspect="aspect-[4/3]" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 5. Nearest Stores to You (Proximity Spotlight) */}
         {nearestListings.length > 0 && (

@@ -46,6 +46,14 @@ const vendorAdPlanSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  // Marketing perks configuration for User App
+  perks: {
+    featuredOnHome: { type: Boolean, default: true },
+    priorityRanking: { type: Boolean, default: true },
+    verifiedBadge: { type: Boolean, default: true },
+    directContact: { type: Boolean, default: true },
+    analyticsAccess: { type: Boolean, default: true }
+  },
   // Badge label for the plan card (e.g., "POPULAR", "BEST VALUE", "NEW")
   badge: {
     type: String,

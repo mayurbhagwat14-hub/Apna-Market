@@ -44,6 +44,16 @@ export const grantVendorSubscription = async (data) => {
   return response.data;
 };
 
+export const cancelVendorSubscription = async (id, reason) => {
+  const response = await api.patch(`/admin/vendor-subscriptions/${id}/cancel`, { reason });
+  return response.data;
+};
+
+export const getVendorsListForAdmin = async () => {
+  const response = await api.get('/admin/vendor-subscriptions/vendors-list');
+  return response.data;
+};
+
 export default {
   getVendorAdPlans,
   getVendorAdPlanById,
@@ -52,5 +62,8 @@ export default {
   deleteVendorAdPlan,
   toggleVendorAdPlan,
   getVendorSubscriptions,
-  grantVendorSubscription
+  grantVendorSubscription,
+  cancelVendorSubscription,
+  getVendorsListForAdmin
 };
+

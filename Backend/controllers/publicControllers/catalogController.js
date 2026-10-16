@@ -641,7 +641,33 @@ const getPublicServiceListings = async (req, res) => {
       ServiceListing.countDocuments(query)
     ]);
 
-    let validListings = listings.map(toPublicListingDto).filter(Boolean);
+    const VendorSubscription = require('../../models/VendorSubscription');
+    const now = new Date();
+    const activeSubs = await VendorSubscription.find({
+      status: 'ACTIVE',
+      endDate: { $gt: now }
+    }).lean();
+
+    const subscriptionMap = new Map();
+    for (const sub of activeSubs) {
+      if (sub.vendorId) {
+        subscriptionMap.set(sub.vendorId.toString(), sub);
+      }
+    }
+
+    let validListings = listings.map(l => toPublicListingDto(l, subscriptionMap)).filter(Boolean);
+
+    // If featured query param is true, filter to only featured listings
+    if (req.query.featured === 'true') {
+      validListings = validListings.filter(l => l.isFeatured || l.isSubscribed);
+    }
+
+    // Sort so subscribed / priority boosted listings are prioritized at the top
+    validListings.sort((a, b) => {
+      const aPriority = a.isSubscribed ? (a.marketingPerks?.priorityRanking ? 2 : 1) : 0;
+      const bPriority = b.isSubscribed ? (b.marketingPerks?.priorityRanking ? 2 : 1) : 0;
+      return bPriority - aPriority;
+    });
 
     // If querying all categories (no specific category selected), deduplicate by physical vendor/store
     if (!categoryId && (!categorySlug || categorySlug === 'all')) {
@@ -753,7 +779,19 @@ const getPublicServiceListingById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Service listing not found' });
     }
 
-    const dto = toPublicListingDto(listing);
+    const VendorSubscription = require('../../models/VendorSubscription');
+    const activeSub = listing.vendorId?._id ? await VendorSubscription.findOne({
+      vendorId: listing.vendorId._id,
+      status: 'ACTIVE',
+      endDate: { $gt: new Date() }
+    }).lean() : null;
+
+    const subMap = new Map();
+    if (activeSub && listing.vendorId?._id) {
+      subMap.set(listing.vendorId._id.toString(), activeSub);
+    }
+
+    const dto = toPublicListingDto(listing, subMap);
     if (!dto) {
       return res.status(404).json({ success: false, message: 'Service listing not found' });
     }

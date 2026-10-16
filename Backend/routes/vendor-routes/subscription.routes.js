@@ -6,7 +6,8 @@ const {
   getAvailablePlans,
   getMySubscription,
   createSubscriptionOrder,
-  verifySubscriptionPayment
+  verifySubscriptionPayment,
+  activateTestSubscription
 } = require('../../controllers/vendorControllers/vendorSubscriptionController');
 
 // GET /api/vendors/subscription/plans — Get all active plans (vendor view)
@@ -20,5 +21,8 @@ router.post('/create-order', authenticate, isVendorSelfService, createSubscripti
 
 // POST /api/vendors/subscription/verify-payment — Verify payment and activate subscription
 router.post('/verify-payment', authenticate, isVendorSelfService, verifySubscriptionPayment);
+
+// POST /api/vendors/subscription/activate-test — Test activation without razorpay
+router.post('/activate-test', authenticate, isVendorSelfService, activateTestSubscription);
 
 module.exports = router;

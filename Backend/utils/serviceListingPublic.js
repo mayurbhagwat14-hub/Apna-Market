@@ -60,12 +60,24 @@ const listingDisplayPrice = (pricing = {}) =>
 
 const isApprovedMarketingItem = (item) => Boolean(item && item.reviewStatus === 'approved');
 
-const toPublicListingDto = (listing) => {
+const toPublicListingDto = (listing, subscriptionMap = null) => {
   const live = overlayApprovedVersion(listing);
   const vendor = live.vendorId;
   const category = live.categoryId;
 
   if (!isVendorPubliclyActive(vendor)) return null;
+
+  const vendorIdStr = vendor?._id?.toString?.() || String(vendor?._id || '');
+  const activeSub = subscriptionMap ? subscriptionMap.get(vendorIdStr) : null;
+  const isSubscribed = Boolean(activeSub);
+  const perks = activeSub?.planSnapshot?.perks || {
+    featuredOnHome: isSubscribed,
+    priorityRanking: isSubscribed,
+    verifiedBadge: isSubscribed,
+    directContact: isSubscribed,
+    analyticsAccess: isSubscribed
+  };
+  const subscriptionBadge = activeSub?.planSnapshot?.badge || (isSubscribed ? 'Featured Partner' : null);
 
   const schema = category?.vendorFormSchema || [];
   const answers = live.dynamicFormAnswers || {};
@@ -84,6 +96,12 @@ const toPublicListingDto = (listing) => {
     categoryName: category?.title || live.categoryName,
     coverImage: realCoverImage,
     image: realCoverImage,
+    isSubscribed,
+    isFeatured: isSubscribed && Boolean(perks.featuredOnHome),
+    promoted: isSubscribed,
+    subscriptionBadge,
+    subscriptionPlan: activeSub?.planSnapshot?.name || null,
+    marketingPerks: perks,
     rating: live.dynamicFormAnswers?.rating || vendor?.rating || 4.8,
     reviewCount: live.dynamicFormAnswers?.reviewCount || vendor?.totalReviews || 0,
     distance: live.dynamicFormAnswers?.distance || null,
@@ -168,7 +186,10 @@ const toPublicListingDto = (listing) => {
       city: vendor.address?.city || '',
       address: vendor.address || {},
       lat: vendor.address?.lat ?? null,
-      lng: vendor.address?.lng ?? null
+      lng: vendor.address?.lng ?? null,
+      phone: vendor.phone || '',
+      isSubscribed,
+      subscriptionBadge
     }
   };
 };

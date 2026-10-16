@@ -198,11 +198,11 @@ const AddService = () => {
   const goNext = () => {
     if (!canGoNext()) {
       if (currentStep.key === 'category') {
-        toast.error('Kripya apni dukaan ki category chuniye');
+        toast.error('Please select your shop category');
       } else if (currentStep.key === 'details') {
-        toast.error('Dukaan / Store ka naam likhna zaroori hai');
+        toast.error('Shop / Store name is required');
       } else if (currentStep.key === 'products') {
-        toast.error('Kam se kam ek kapda / design / product add karein');
+        toast.error('Please add at least one item / product');
       }
       return;
     }
@@ -305,12 +305,12 @@ const AddService = () => {
       if (res.data?.success) {
         const msg = isDraft
           ? 'Draft successfully saved!'
-          : 'Dukaan advertisement approval ke liye submit ho gayi hai! Admin verify karte hi live ho jayegi.';
+          : 'Shop listing submitted for approval! It will go live once verified by Admin.';
         toast.success(res.data.message || msg);
         navigate('/vendor/my-services');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Dukaan save karne me samasya aayi');
+      toast.error(err.response?.data?.message || 'Failed to save shop listing');
     } finally {
       setSubmitting(false);
     }
@@ -322,7 +322,7 @@ const AddService = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <FiLoader className="w-8 h-8 text-primary-600 animate-spin" />
-          <p className="text-sm text-slate-500 font-bold">Dukaan jankari load ho rahi hai...</p>
+          <p className="text-sm text-slate-500 font-bold">Loading shop details...</p>
         </div>
       </div>
     );
@@ -338,7 +338,7 @@ const AddService = () => {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-black text-slate-900 truncate">
-              {isEdit ? 'Dukaan Listing Edit Karein' : 'Dukaan Listing & Advertisement'}
+              {isEdit ? 'Edit Shop Listing' : 'Shop Listing & Advertisement'}
             </h1>
             {selectedCategory && (
               <p className="text-[10px] font-bold text-primary-600 truncate">
@@ -446,7 +446,7 @@ const AddService = () => {
                 className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 active:scale-95 transition-all disabled:opacity-40 shadow-md"
               >
                 {submitting ? <FiLoader className="w-4 h-4 animate-spin" /> : <FiSend className="w-4 h-4" />}
-                {submitting ? 'Submit ho raha hai...' : 'Dukaan Publish Karein'}
+                {submitting ? 'Submitting...' : 'Publish Shop'}
               </button>
             </div>
           )}
@@ -464,10 +464,10 @@ const StepCategory = ({ categories, form, onSelectCategory }) => (
     <div className="bg-primary-50 rounded-2xl p-4 border border-primary-100">
       <div className="flex items-center gap-2">
         <FiShoppingBag className="w-5 h-5 text-primary-700" />
-        <h3 className="text-sm font-black text-primary-900">Apni Dukaan ki Category Chuniye</h3>
+        <h3 className="text-sm font-black text-primary-900">Select Your Shop Category</h3>
       </div>
       <p className="text-xs text-primary-700 mt-1 leading-relaxed">
-        Aapki dukaan kis cheez ki hai? Category chunne ke baad aap dukan ki photos, special offers, location aur cloths/products list kar sakenge.
+        Choose what type of business you run. Once chosen, you can add photos, special offers, location details, and items.
       </p>
     </div>
 
@@ -529,9 +529,9 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
   return (
     <div className="space-y-4">
       {/* Basic Shop Information */}
-      <SectionCard title="Dukaan ki Jankari (Basic Info)" icon="🏬">
+      <SectionCard title="Basic Shop Info" icon="🏬">
         <FormInput
-          label="Dukaan / Store Name *"
+          label="Shop / Store Name *"
           value={form.title}
           onChange={v => updateForm('title', v)}
           placeholder="e.g. Rajesh Sarees & Boutique / Mahalaxmi Cloth Store"
@@ -546,7 +546,7 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
           label="About Your Shop / Description"
           value={form.description}
           onChange={v => updateForm('description', v)}
-          placeholder="Apni dukaan ke baare mein likhein (jaise 10 saal se trusted dukaan, custom fitting, bridal collection, etc.)..."
+          placeholder="Describe your shop (e.g. 10 years of trusted service, custom fitting, bridal collection, etc.)..."
           rows={3}
         />
       </SectionCard>
@@ -555,7 +555,7 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
       {vendorSchema.length > 0 && (
         <SectionCard title={`${category?.title || 'Shop'} Specific Details`} icon="✨">
           <p className="text-[11px] text-slate-500 mb-2">
-            Ye details customers ko aapki dukaan discover karne me madad karegi:
+            These details help customers discover your shop:
           </p>
           <DynamicFormFields
             schema={vendorSchema}
@@ -567,7 +567,7 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
       )}
 
       {/* Address & Location */}
-      <SectionCard title="Dukaan ka Pata & Location (Address)" icon="📍">
+      <SectionCard title="Shop Address & Location" icon="📍">
         <div className="mb-3">
           <VendorLocationPicker
             initialPosition={form.lat && form.lng ? { lat: form.lat, lng: form.lng } : null}
@@ -590,7 +590,7 @@ const StepDetails = ({ form, updateForm, updateDynamic, toggleDynamicMulti, cate
           placeholder="e.g. Shop No. 12, First Floor, Sarafa Market, Near Rajwada"
         />
         <FormInput
-          label="Landmark (Prasiddh Sthan)"
+          label="Landmark (Optional)"
           value={form.landmark}
           onChange={v => updateForm('landmark', v)}
           placeholder="e.g. Opposite State Bank of India"
@@ -682,9 +682,9 @@ const StepPhotos = ({ form, setForm }) => {
   return (
     <div className="space-y-4">
       {/* Main Cover Banner */}
-      <SectionCard title="Dukaan ka Main Advertisement Banner (Cover Photo)" icon="🖼️">
+      <SectionCard title="Main Cover Banner (Advertisement Photo)" icon="🖼️">
         <p className="text-[11px] text-slate-500">
-          Ye banner aapki dukaan ke profile aur Apna Market home screen pe sabse upar dikhega.
+          This banner appears at the top of your shop profile and on the Apna Market home screen.
         </p>
         {form.bannerPhoto ? (
           <div className="relative aspect-[16/8] rounded-2xl overflow-hidden border border-slate-200 group">
@@ -700,7 +700,7 @@ const StepPhotos = ({ form, setForm }) => {
         ) : (
           <label className="aspect-[16/8] rounded-2xl border-2 border-dashed border-primary-300 bg-primary-50/40 hover:bg-primary-50 flex flex-col items-center justify-center cursor-pointer transition-all">
             <FiCamera className="w-8 h-8 text-primary-600 mb-1" />
-            <span className="text-xs font-bold text-primary-800">Main Banner Photo Upload Karein</span>
+            <span className="text-xs font-bold text-primary-800">Upload Main Banner Photo</span>
             <span className="text-[10px] text-slate-400 mt-0.5">High resolution wide photo (16:9)</span>
             <input type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
           </label>
@@ -708,9 +708,9 @@ const StepPhotos = ({ form, setForm }) => {
       </SectionCard>
 
       {/* Shop Front Photo */}
-      <SectionCard title="Dukaan ke Samne ki Photo (Shop Board / Entrance)" icon="🏬">
+      <SectionCard title="Shop Front & Entrance Photo" icon="🏬">
         <p className="text-[11px] text-slate-500">
-          Dukaan ke bahar aur board ki photo taaki customer dukaan aasani se pehchan sakein.
+          Outside view and name board photo so customers can easily locate your shop.
         </p>
         {form.frontPhoto ? (
           <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-slate-200">
@@ -726,16 +726,16 @@ const StepPhotos = ({ form, setForm }) => {
         ) : (
           <label className="aspect-[16/9] rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center cursor-pointer transition-all">
             <FiImage className="w-7 h-7 text-slate-400 mb-1" />
-            <span className="text-xs font-bold text-slate-700">Dukaan Board / Entrance Photo</span>
+            <span className="text-xs font-bold text-slate-700">Shop Board / Entrance Photo</span>
             <input type="file" accept="image/*" className="hidden" onChange={handleFrontUpload} />
           </label>
         )}
       </SectionCard>
 
       {/* Gallery Photos */}
-      <SectionCard title="Dukaan ke Andar ki Photos (Cloth Racks / Display / Ambience)" icon="📸">
+      <SectionCard title="Interior & Display Photos (Ambience / Racks)" icon="📸">
         <p className="text-[11px] text-slate-500 mb-2">
-          Dukaan ke displays, kapdo ke racks, counters ki photos add karein (Max 10).
+          Add photos of your store display, counters, and shelves (Max 10).
         </p>
         <div className="grid grid-cols-3 gap-2.5">
           {(form.portfolioPhotos || []).map((photo, i) => (
@@ -775,10 +775,10 @@ const StepOffers = ({ form, updateOffer }) => {
       <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
         <div className="flex items-center gap-2">
           <FiTag className="w-5 h-5 text-amber-700" />
-          <h3 className="text-sm font-black text-amber-900">Dukaan ke Special Offers & Discounts</h3>
+          <h3 className="text-sm font-black text-amber-900">Special Offers & Discounts</h3>
         </div>
         <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-          Apni dukaan par chal rahe festive discounts, season sale ya special deals yahan daalein. Customers ko ye offer card sabse pehle dikhega!
+          Highlight ongoing sales, festive discounts, or special deals. Customers will see this prominent offer badge on your shop card!
         </p>
       </div>
 
@@ -886,7 +886,7 @@ const StepProducts = ({ form, setForm, category }) => {
       <div className="bg-primary-50 rounded-2xl p-4 border border-primary-100">
         <h3 className="text-sm font-black text-primary-900">Designs, Clothes & Products Showcase</h3>
         <p className="text-xs text-primary-700 mt-1 leading-relaxed">
-          Aapki dukaan ke main designs, kapde, ya items list karein taaki customers photos aur daam (price) dekh sakein.
+          List your featured items, products, or collections with photos and prices for customers.
         </p>
       </div>
 
@@ -931,7 +931,7 @@ const StepProducts = ({ form, setForm, category }) => {
                   placeholder="e.g. Banarasi Silk Saree / Designer Kurti / Linen Shirt"
                 />
                 <FormInput
-                  label="Price (₹) / Daam"
+                  label="Price (₹)"
                   type="number"
                   value={item.price}
                   onChange={v => updateItem(idx, 'price', v)}
@@ -955,7 +955,7 @@ const StepProducts = ({ form, setForm, category }) => {
         onClick={addItem}
         className="w-full py-3.5 rounded-2xl border-2 border-dashed border-primary-400 bg-primary-50/50 text-primary-700 font-black text-xs flex items-center justify-center gap-2 hover:bg-primary-50 active:scale-[0.99] transition-all"
       >
-        <FiPlus className="w-4 h-4" /> + Aur Design / Cloth Add Karein
+        <FiPlus className="w-4 h-4" /> + Add Another Item / Design
       </button>
     </div>
   );
@@ -965,7 +965,7 @@ const StepProducts = ({ form, setForm, category }) => {
 // STEP 5: PREVIEW & PUBLISH
 // ════════════════════════════════════════════════════════════════
 const StepPreview = ({ form, category }) => {
-  const title = form.title || form.dynamicFormAnswers.shopName || form.dynamicFormAnswers.boutiqueName || 'My Dukaan';
+  const title = form.title || form.dynamicFormAnswers.shopName || form.dynamicFormAnswers.boutiqueName || 'My Shop';
   const coverImage = form.bannerPhoto || form.frontPhoto || (form.portfolioPhotos && form.portfolioPhotos[0]) || category?.imageUrl;
   const items = (form.catalogItems || []).filter(i => (i.title || '').trim().length > 0);
 
@@ -973,10 +973,10 @@ const StepPreview = ({ form, category }) => {
     <div className="space-y-4">
       <div className="bg-primary-600 text-white rounded-2xl p-4 shadow-md">
         <h3 className="text-sm font-black flex items-center gap-1.5">
-          <FiEye className="w-4 h-4" /> Dukaan Advertisement Preview
+          <FiEye className="w-4 h-4" /> Shop Advertisement Preview
         </h3>
         <p className="text-xs text-white/90 mt-1">
-          Aapki dukaan ka advertisement Apna Market pe is tarah dikhega:
+          This is how your shop advertisement will appear on Apna Market:
         </p>
       </div>
 
@@ -1068,7 +1068,7 @@ const StepPreview = ({ form, category }) => {
           {form.portfolioPhotos?.length > 0 && (
             <div>
               <p className="text-[11px] font-black text-slate-900 uppercase tracking-wide mb-2">
-                Dukaan Photos ({form.portfolioPhotos.length})
+                Shop Photos ({form.portfolioPhotos.length})
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {form.portfolioPhotos.map((p, i) => (
@@ -1083,7 +1083,7 @@ const StepPreview = ({ form, category }) => {
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
         <FiCheck className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
         <div>
-          <span className="font-bold">Ready to Publish:</span> 'Dukaan Publish Karein' par tap karein. Admin verification ke baad aapki dukaan Apna Market pe live ho jayegi.
+          <span className="font-bold">Ready to Publish:</span> Tap 'Publish Shop'. Once verified by Admin, your shop will go live on Apna Market.
         </div>
       </div>
     </div>

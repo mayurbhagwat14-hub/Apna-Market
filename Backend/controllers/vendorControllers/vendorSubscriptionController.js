@@ -148,7 +148,9 @@ const createSubscriptionOrder = async (req, res) => {
         price: plan.price,
         durationType: plan.durationType,
         durationValue: plan.durationValue,
-        features: plan.features
+        features: plan.features,
+        perks: plan.perks,
+        badge: plan.badge
       },
       startDate,
       endDate,
@@ -270,9 +272,80 @@ const verifySubscriptionPayment = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/vendors/subscription/activate-test
+ * For test/development: activates subscription immediately
+ */
+const activateTestSubscription = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { planId } = req.body;
+    if (!planId) return res.status(400).json({ success: false, message: 'planId is required' });
+
+    const plan = await VendorAdPlan.findById(planId);
+    if (!plan || !plan.isActive) return res.status(404).json({ success: false, message: 'Plan not found' });
+
+    // Cancel existing active subscription
+    await VendorSubscription.updateMany(
+      { vendorId, status: 'ACTIVE' },
+      { status: 'EXPIRED', cancelReason: 'Upgraded to new subscription', cancelledBy: 'vendor', cancelledAt: new Date() }
+    );
+
+    const startDate = new Date();
+    const endDate = calculateEndDate(startDate, plan.durationType, plan.durationValue);
+
+    const subscription = new VendorSubscription({
+      vendorId,
+      planId: plan._id,
+      planSnapshot: {
+        name: plan.name,
+        price: plan.price,
+        durationType: plan.durationType,
+        durationValue: plan.durationValue,
+        features: plan.features,
+        perks: plan.perks,
+        badge: plan.badge
+      },
+      startDate,
+      endDate,
+      status: 'ACTIVE',
+      amountPaid: plan.price,
+      gstAmount: Math.round(plan.price * 0.18),
+      totalAmount: Math.round(plan.price * 1.18),
+      paymentMethod: 'free',
+      receiptNumber: `TEST-${Date.now()}`
+    });
+
+    await subscription.save();
+
+    await VendorAdPlan.findByIdAndUpdate(plan._id, {
+      $inc: { totalPurchases: 1, totalRevenue: subscription.totalAmount }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: '🎉 Subscription activated successfully in test mode!',
+      data: {
+        subscription: {
+          _id: subscription._id,
+          planName: subscription.planSnapshot.name,
+          startDate: subscription.startDate,
+          endDate: subscription.endDate,
+          amountPaid: subscription.amountPaid,
+          status: 'ACTIVE'
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error in activateTestSubscription:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to activate test subscription' });
+  }
+};
+
 module.exports = {
   getAvailablePlans,
   getMySubscription,
   createSubscriptionOrder,
-  verifySubscriptionPayment
+  verifySubscriptionPayment,
+  activateTestSubscription
 };
