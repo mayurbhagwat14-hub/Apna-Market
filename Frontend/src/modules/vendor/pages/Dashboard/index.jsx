@@ -293,19 +293,32 @@ const Dashboard = memo(() => {
 
   const handleToggleOffer = async (id, isActive) => {
     try {
-      await vendorMarketingService.updateOffer(id, { isActive });
+      const res = await vendorMarketingService.updateOffer(id, { isActive });
+      const updatedReviewStatus = res?.offer?.reviewStatus;
       setMarketingData(prev => ({
         ...prev,
-        offers: prev.offers.map(o => (o._id === id || o.id === id ? { ...o, isActive, reviewStatus: 'pending' } : o)),
+        offers: prev.offers.map(o => {
+          if (o._id === id || o.id === id) {
+            return {
+              ...o,
+              isActive,
+              reviewStatus: updatedReviewStatus || o.reviewStatus || 'approved'
+            };
+          }
+          return o;
+        }),
         stats: {
           ...prev.stats,
-          activeOffersCount: prev.offers.filter(o => {
-            if (o._id === id || o.id === id) return false;
-            return (!o.reviewStatus || o.reviewStatus === 'approved') && o.isActive;
-          }).length
+          activeOffersCount: prev.offers.reduce((count, o) => {
+            const isTarget = (o._id === id || o.id === id);
+            const active = isTarget ? isActive : o.isActive;
+            const status = isTarget ? (updatedReviewStatus || o.reviewStatus || 'approved') : o.reviewStatus;
+            const isApproved = !status || status === 'approved';
+            return (active && isApproved) ? count + 1 : count;
+          }, 0)
         }
       }));
-      toast.success(isActive ? 'Offer activation sent for admin approval' : 'Offer pause sent for admin approval');
+      toast.success(isActive ? 'Offer activated' : 'Offer paused');
     } catch (err) {
       toast.error('Failed to update offer');
     }

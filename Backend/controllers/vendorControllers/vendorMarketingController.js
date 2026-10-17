@@ -210,6 +210,9 @@ const updateOffer = async (req, res) => {
     const offer = vendor.offers.id(id);
     if (!offer) return res.status(404).json({ success: false, message: 'Offer not found' });
 
+    const updateKeys = Object.keys(updates);
+    const isOnlyTogglingActive = updateKeys.length === 1 && updates.isActive !== undefined;
+
     if (updates.title !== undefined) offer.title = updates.title.trim();
     if (updates.tagline !== undefined) offer.tagline = updates.tagline.trim();
     if (updates.discountBadge !== undefined) offer.discountBadge = updates.discountBadge;
@@ -229,17 +232,28 @@ const updateOffer = async (req, res) => {
       }
     }
 
-    offer.reviewStatus = 'pending';
-    offer.reviewedAt = null;
-    offer.reviewedBy = null;
-    offer.rejectedReason = null;
+    if (isOnlyTogglingActive) {
+      // Toggling active/pause state should NOT reset review status to pending
+      // If it was previously stuck in pending due to toggling, restore to approved
+      if (offer.reviewStatus === 'pending') {
+        offer.reviewStatus = 'approved';
+      }
+    } else {
+      // Content modified -> requires admin approval
+      offer.reviewStatus = 'pending';
+      offer.reviewedAt = null;
+      offer.reviewedBy = null;
+      offer.rejectedReason = null;
+    }
 
     await vendor.save();
     await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(200).json({
       success: true,
-      message: 'Offer update submitted for admin approval',
+      message: isOnlyTogglingActive
+        ? (offer.isActive ? 'Offer activated successfully' : 'Offer paused successfully')
+        : 'Offer update submitted for admin approval',
       offer
     });
   } catch (error) {
