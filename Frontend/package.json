@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
-    "build": "node --max-old-space-size=4096 ./scripts/build.js",
+    "dev": "node init && vite --host",
+    "build": "node init && node --max-old-space-size=4096 ./scripts/build.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

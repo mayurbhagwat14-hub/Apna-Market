@@ -3,11 +3,7 @@ node_modules/
 **/node_modules/
 
 # Environment Variables
-.env
-.env.*
 !.env.example
-**/.env
-**/.env.*
 !**/.env.example
 
 # Logs
@@ -27,7 +23,7 @@ temp_auto_push.bat
 temp_interactive_push.bat
 
 # IDE / System
-.vscode/
 .idea/
 .DS_Store
 Thumbs.db
+config.bat
