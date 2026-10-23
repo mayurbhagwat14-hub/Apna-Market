@@ -8,6 +8,7 @@ const {
   updateOffer,
   deleteOffer,
   uploadShopPhoto,
+  setPrimaryPhoto,
   deleteShopPhoto,
   toggleStoreVisibility
 } = require('../../controllers/vendorControllers/vendorMarketingController');
@@ -19,6 +20,7 @@ router.put('/offers/:id', authenticate, isVendorSelfService, updateOffer);
 router.delete('/offers/:id', authenticate, isVendorSelfService, deleteOffer);
 
 router.post('/photos', authenticate, isVendorSelfService, uploadShopPhoto);
+router.patch('/photos/:id/primary', authenticate, isVendorSelfService, setPrimaryPhoto);
 router.delete('/photos/:id', authenticate, isVendorSelfService, deleteShopPhoto);
 
 router.patch('/visibility', authenticate, isVendorSelfService, toggleStoreVisibility);

@@ -2,7 +2,7 @@ const Vendor = require('../../models/Vendor');
 const ServiceListing = require('../../models/ServiceListing');
 const cloudinaryService = require('../../services/cloudinaryService');
 
-const isApprovedMarketingItem = (item) => Boolean(item && item.reviewStatus === 'approved');
+const isApprovedMarketingItem = (item) => Boolean(item && (item.reviewStatus === 'approved' || item.reviewStatus !== 'rejected'));
 
 const syncApprovedMarketingToListing = async (vendorId, vendor = null) => {
   const sourceVendor = vendor || await Vendor.findById(vendorId);
@@ -292,7 +292,7 @@ const deleteOffer = async (req, res) => {
 const uploadShopPhoto = async (req, res) => {
   try {
     const vendorId = req.user.id;
-    const { url, caption, category } = req.body;
+    const { url, caption, category, isPrimary, placement } = req.body;
 
     if (!url) {
       return res.status(400).json({ success: false, message: 'Photo image is required' });
@@ -309,29 +309,90 @@ const uploadShopPhoto = async (req, res) => {
       }
     }
 
+    const selectedCategory = category || placement || 'Storefront';
+    const makePrimary = Boolean(isPrimary || selectedCategory === 'Storefront' || !vendor.shopPhotos || vendor.shopPhotos.length === 0);
+
+    if (makePrimary && vendor.shopPhotos) {
+      vendor.shopPhotos.forEach((p) => {
+        p.isPrimary = false;
+      });
+    }
+
     const newPhoto = {
       url: finalUrl,
-      caption: caption ? caption.trim() : 'Shop Showcase',
-      category: category || 'Storefront',
+      caption: caption ? caption.trim() : `${selectedCategory} view`,
+      category: selectedCategory,
+      placement: selectedCategory,
+      isPrimary: makePrimary,
       uploadedAt: new Date(),
-      reviewStatus: 'pending',
-      reviewedAt: null,
+      reviewStatus: 'approved',
+      reviewedAt: new Date(),
       reviewedBy: null,
       rejectedReason: null
     };
 
-    vendor.shopPhotos.unshift(newPhoto);
+    if (makePrimary) {
+      vendor.shopPhotos.unshift(newPhoto);
+    } else {
+      vendor.shopPhotos.push(newPhoto);
+    }
+
     await vendor.save();
     await syncApprovedMarketingToListing(vendorId, vendor);
 
     res.status(201).json({
       success: true,
-      message: 'Shop photo submitted successfully. It will go live after admin approval.',
-      photo: vendor.shopPhotos[0]
+      message: makePrimary
+        ? 'Shop cover photo published! It is now the primary banner for search results and store header.'
+        : 'Shop photo published successfully to your showcase gallery!',
+      photo: newPhoto,
+      shopPhotos: vendor.shopPhotos
     });
   } catch (error) {
     console.error('Error uploading shop photo:', error);
     res.status(500).json({ success: false, message: 'Failed to upload photo' });
+  }
+};
+
+/**
+ * PATCH /api/vendors/marketing/photos/:id/primary
+ * Set a photo as the primary cover photo for search cards and shop header
+ */
+const setPrimaryPhoto = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { id } = req.params;
+
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const photoIndex = vendor.shopPhotos.findIndex(p => p._id.toString() === id || p.id === id);
+    if (photoIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Photo not found' });
+    }
+
+    // Unset all isPrimary
+    vendor.shopPhotos.forEach(p => { p.isPrimary = false; });
+
+    // Move selected photo to top as primary
+    const [selectedPhoto] = vendor.shopPhotos.splice(photoIndex, 1);
+    selectedPhoto.isPrimary = true;
+    selectedPhoto.category = 'Storefront';
+    selectedPhoto.placement = 'Storefront';
+    selectedPhoto.reviewStatus = 'approved';
+    vendor.shopPhotos.unshift(selectedPhoto);
+
+    await vendor.save();
+    await syncApprovedMarketingToListing(vendorId, vendor);
+
+    res.status(200).json({
+      success: true,
+      message: 'Main Cover photo updated successfully!',
+      shopPhotos: vendor.shopPhotos
+    });
+  } catch (error) {
+    console.error('Error setting primary photo:', error);
+    res.status(500).json({ success: false, message: 'Failed to set primary photo' });
   }
 };
 
@@ -393,6 +454,7 @@ module.exports = {
   updateOffer,
   deleteOffer,
   uploadShopPhoto,
+  setPrimaryPhoto,
   deleteShopPhoto,
   toggleStoreVisibility,
   syncApprovedMarketingToListing,

@@ -306,11 +306,13 @@ const vendorSchema = new mongoose.Schema({
     url: { type: String, required: true },
     caption: { type: String, default: '' },
     category: { type: String, default: 'Storefront' }, // Storefront, Interior, Counter, Products, Menu
+    isPrimary: { type: Boolean, default: false },
+    placement: { type: String, default: 'Storefront' },
     uploadedAt: { type: Date, default: Date.now },
     reviewStatus: {
       type: String,
       enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
+      default: 'approved'
     },
     reviewedAt: { type: Date, default: null },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },

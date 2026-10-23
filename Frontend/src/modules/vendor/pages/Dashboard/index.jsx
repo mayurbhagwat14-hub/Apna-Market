@@ -350,6 +350,22 @@ const Dashboard = memo(() => {
     }
   };
 
+  const handleSetPrimaryPhoto = async (id) => {
+    try {
+      const res = await vendorMarketingService.setPrimaryPhoto(id);
+      if (res.success) {
+        toast.success('👑 Main Cover Photo updated!');
+        if (res.shopPhotos) {
+          setMarketingData(prev => ({ ...prev, shopPhotos: res.shopPhotos }));
+        } else {
+          await loadMarketingData();
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update main cover photo');
+    }
+  };
+
   const handleDeletePhoto = async (id) => {
     if (!window.confirm('Are you sure you want to remove this photo?')) return;
     try {
@@ -531,6 +547,10 @@ const Dashboard = memo(() => {
             photos={marketingData.shopPhotos}
             onOpenUploadModal={() => setIsPhotoModalOpen(true)}
             onDeletePhoto={handleDeletePhoto}
+            onSetPrimaryPhoto={handleSetPrimaryPhoto}
+            storeName={currentStoreName}
+            category={marketingData.category}
+            address={marketingData.address}
           />
         </div>
 
@@ -623,6 +643,7 @@ const Dashboard = memo(() => {
         isOpen={isPhotoModalOpen}
         onClose={() => setIsPhotoModalOpen(false)}
         onPhotoUploaded={handleUploadPhoto}
+        currentStoreName={currentStoreName}
       />
 
     </div>

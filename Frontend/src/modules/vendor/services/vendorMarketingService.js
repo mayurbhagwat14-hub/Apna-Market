@@ -26,6 +26,11 @@ export const vendorMarketingService = {
     return response.data;
   },
 
+  setPrimaryPhoto: async (id) => {
+    const response = await api.patch(`/vendors/marketing/photos/${id}/primary`);
+    return response.data;
+  },
+
   deletePhoto: async (id) => {
     const response = await api.delete(`/vendors/marketing/photos/${id}`);
     return response.data;
